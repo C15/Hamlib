@@ -641,7 +641,6 @@
 #define RIG_GOMSPACE 35
 #define RIG_BACKEND_GOMSPACE "gomspace"
 #define RIG_MODEL_GS100 RIG_MAKE_MODEL(RIG_GOMSPACE, 1)
-
 /*
  * MDS Microwave Data Systems https://en.wikipedia.org/wiki/Microwave_Data_Systems
  */
@@ -649,6 +648,12 @@
 #define RIG_BACKEND_MDS "MDS"
 #define RIG_MODEL_MDS4710 RIG_MAKE_MODEL(RIG_MDS, 1)
 #define RIG_MODEL_MDS9710 RIG_MAKE_MODEL(RIG_MDS, 2)
+/*
+ * Primesat
+ */
+#define RIG_PRIMESAT 37
+#define RIG_BACKEND_PRIMESAT "primesat"
+#define RIG_MODEL_PRIMECONTROLLER RIG_MAKE_MODEL(RIG_PRIMESAT, 1)
 /*
  * TODO:
     RIG_MODEL_KWZ30,    KNEISNER +DOERING

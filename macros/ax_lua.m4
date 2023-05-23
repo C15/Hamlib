@@ -1,5 +1,5 @@
 # ===========================================================================
-#          http://www.gnu.org/software/autoconf-archive/ax_lua.html
+#          https://www.gnu.org/software/autoconf-archive/ax_lua.html
 # ===========================================================================
 #
 # SYNOPSIS
@@ -82,7 +82,7 @@
 #   appropriate Automake primary, e.g. lua_SCRIPS or luaexec_LIBRARIES.
 #
 #   If an acceptable Lua interpreter is found, then ACTION-IF-FOUND is
-#   performed, otherwise ACTION-IF-NOT-FOUND is performed. If ACTION-IF-NOT-
+#   performed, otherwise ACTION-IF-NOT-FOUND is preformed. If ACTION-IF-NOT-
 #   FOUND is blank, then it will default to printing an error. To prevent
 #   the default behavior, give ':' as an action.
 #
@@ -166,7 +166,7 @@
 #   Public License for more details.
 #
 #   You should have received a copy of the GNU General Public License along
-#   with this program. If not, see <http://www.gnu.org/licenses/>.
+#   with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 #   As a special exception, the respective Autoconf Macro's copyright owner
 #   gives unlimited permission to copy, distribute and modify the configure
@@ -181,7 +181,7 @@
 #   modified version of the Autoconf Macro, you may extend this special
 #   exception to the GPL to apply to your modified version as well.
 
-#serial 39
+#serial 42
 
 dnl =========================================================================
 dnl AX_PROG_LUA([MINIMUM-VERSION], [TOO-BIG-VERSION],
@@ -524,22 +524,17 @@ AC_DEFUN([AX_LUA_HEADERS],
             [ax_cv_lua_header_version],
             [ _ax_lua_saved_cppflags=$CPPFLAGS
               CPPFLAGS="$CPPFLAGS $LUA_INCLUDE"
-              AC_RUN_IFELSE(
-                [ AC_LANG_SOURCE([[
+              AC_COMPUTE_INT(ax_cv_lua_header_version_major,[LUA_VERSION_NUM/100],[AC_INCLUDES_DEFAULT
 #include <lua.h>
-#include <stdlib.h>
-#include <stdio.h>
-int main(int argc, char ** argv)
-{
-  if(argc > 1) printf("%s", LUA_VERSION);
-  exit(EXIT_SUCCESS);
-}
-]])
-                ],
-                [ ax_cv_lua_header_version=`./conftest$EXEEXT p | \
-                    $SED -n "s|^Lua \(@<:@0-9@:>@\{1,\}\.@<:@0-9@:>@\{1,\}\).\{0,\}|\1|p"`
-                ],
-                [ax_cv_lua_header_version='unknown'])
+],[ax_cv_lua_header_version_major=unknown])
+              AC_COMPUTE_INT(ax_cv_lua_header_version_minor,[LUA_VERSION_NUM%100],[AC_INCLUDES_DEFAULT
+#include <lua.h>
+],[ax_cv_lua_header_version_minor=unknown])
+              AS_IF([test "x$ax_cv_lua_header_version_major" = xunknown || test "x$ax_cv_lua_header_version_minor" = xunknown],[
+                ax_cv_lua_header_version=unknown
+              ],[
+                ax_cv_lua_header_version="$ax_cv_lua_header_version_major.$ax_cv_lua_header_version_minor"
+              ])
               CPPFLAGS=$_ax_lua_saved_cppflags
             ])
 

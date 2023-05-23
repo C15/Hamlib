@@ -25,7 +25,7 @@ SUBDIRS = macros include lib security \
 
 ## Static list of distributed directories.
 DIST_SUBDIRS = macros include lib src c++ bindings tests doc android scripts rotators/indi simulators\
-	security $(BACKEND_LIST) $(RIG_BACKEND_LIST) $(ROT_BACKEND_LIST) $(AMP_BACKEND_LIST)
+	security $(BACKEND_LIST) $(RIG_BACKEND_LIST) $(ROT_BACKEND_LIST) $(AMP_BACKEND_LIST) rigs/primesat
 
 # Install any third party macros into our tree for distribution
 ACLOCAL_AMFLAGS = -I macros --install
