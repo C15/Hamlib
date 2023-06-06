@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef _DUMMY_H
-#define _DUMMY_H 1
+#ifndef _PRIMESAT_H
+#define _PRIMESAT_H 1
 
 #include "hamlib/rig.h"
 #include "token.h"
@@ -48,6 +48,6 @@ extern const struct rig_caps tci1x_caps;
 extern const struct rig_caps aclog_caps;
 extern const struct rig_caps sdrsharp_caps;
 
-int netrigctl_get_vfo_mode(RIG *);
+//int netrigctl_get_vfo_mode(RIG *);
 
-#endif /* _DUMMY_H */
+#endif /* _PRIMESAT_H */

@@ -1,7 +1,7 @@
 /*
- *  Hamlib Dummy backend - main file
- *  Copyright (c) 2001-2010 by Stephane Fillod
- *  Copyright (c) 2010 by Nate Bargmann
+ *  Hamlib Primesat backend - main file
+ *  Contibuted by Manuel Santos
+ *  
  *
  *
  *   This library is free software; you can redistribute it and/or
@@ -43,7 +43,7 @@
 #include "idx_builtin.h"
 #include "register.h"
 
-#include "primesat"
+#include "primesat.h"
 
 
 #define NB_CHAN 22      /* see caps->chan_list */
@@ -51,7 +51,7 @@
 
 #define CMDSLEEP 20*1000  /* ms for each command */
 
-struct dummy_priv_data
+struct primesat_priv_data
 {
     /* current vfo already in rig_state ? */
     vfo_t curr_vfo;
@@ -89,7 +89,7 @@ struct dummy_priv_data
 };
 
 /* levels pertain to each VFO */
-static const struct confparams dummy_ext_levels[] =
+static const struct confparams primesat_ext_levels[] =
 {
     {
         TOK_EL_MAGICLEVEL, "MGL", "Magic level", "Magic level, as an example",
@@ -110,7 +110,7 @@ static const struct confparams dummy_ext_levels[] =
     { RIG_CONF_END, NULL, }
 };
 
-static const struct confparams dummy_ext_funcs[] =
+static const struct confparams primesat_ext_funcs[] =
 {
     {
         TOK_EL_MAGICEXTFUNC, "MGEF", "Magic ext func", "Magic ext function, as an example",
@@ -120,7 +120,7 @@ static const struct confparams dummy_ext_funcs[] =
 };
 
 /* parms pertain to the whole rig */
-static const struct confparams dummy_ext_parms[] =
+static const struct confparams primesat_ext_parms[] =
 {
     {
         TOK_EP_MAGICPARM, "MGP", "Magic parm", "Magic parameter, as an example",
@@ -130,7 +130,7 @@ static const struct confparams dummy_ext_parms[] =
 };
 
 /* cfgparams are configuration item generally used by the backend's open() method */
-static const struct confparams dummy_cfg_params[] =
+static const struct confparams primesat_cfg_params[] =
 {
     {
         TOK_CFG_MAGICCONF, "mcfg", "Magic conf", "Magic parameter, as an example",
@@ -217,13 +217,13 @@ static void copy_chan(channel_t *dest, const channel_t *src)
     dest->ext_levels = saved_ext_levels;
 }
 
-static int dummy_init(RIG *rig)
+static int primesat_init(RIG *rig)
 {
-    struct dummy_priv_data *priv;
+    struct primesat_priv_data *priv;
     int i;
 
     ENTERFUNC;
-    priv = (struct dummy_priv_data *)calloc(1, sizeof(struct dummy_priv_data));
+    priv = (struct primesat_priv_data *)calloc(1, sizeof(struct primesat_priv_data));
 
     if (!priv)
     {
@@ -249,7 +249,7 @@ static int dummy_init(RIG *rig)
         priv->mem[i].channel_num = i;
         priv->mem[i].vfo = RIG_VFO_MEM;
 
-        priv->mem[i].ext_levels = alloc_init_ext(dummy_ext_levels);
+        priv->mem[i].ext_levels = alloc_init_ext(primesat_ext_levels);
 
         if (!priv->mem[i].ext_levels)
         {
@@ -257,28 +257,28 @@ static int dummy_init(RIG *rig)
         }
     }
 
-    priv->vfo_a.ext_levels = alloc_init_ext(dummy_ext_levels);
+    priv->vfo_a.ext_levels = alloc_init_ext(primesat_ext_levels);
 
     if (!priv->vfo_a.ext_levels)
     {
         RETURNFUNC(-RIG_ENOMEM);
     }
 
-    priv->vfo_b.ext_levels = alloc_init_ext(dummy_ext_levels);
+    priv->vfo_b.ext_levels = alloc_init_ext(primesat_ext_levels);
 
     if (!priv->vfo_b.ext_levels)
     {
         RETURNFUNC(-RIG_ENOMEM);
     }
 
-    priv->ext_funcs = alloc_init_ext(dummy_ext_funcs);
+    priv->ext_funcs = alloc_init_ext(primesat_ext_funcs);
 
     if (!priv->ext_funcs)
     {
         RETURNFUNC(-RIG_ENOMEM);
     }
 
-    priv->ext_parms = alloc_init_ext(dummy_ext_parms);
+    priv->ext_parms = alloc_init_ext(primesat_ext_parms);
 
     if (!priv->ext_parms)
     {
@@ -293,7 +293,7 @@ static int dummy_init(RIG *rig)
     init_chan(rig, RIG_VFO_SUB_B, &priv->vfo_subb);
     priv->curr = &priv->vfo_a;
 
-    if (rig->caps->rig_model == RIG_MODEL_DUMMY_NOVFO)
+    if (rig->caps->rig_model == RIG_MODEL_primesat_NOVFO)
     {
         priv->curr_vfo = priv->last_vfo = RIG_VFO_CURR;
     }
@@ -307,9 +307,9 @@ static int dummy_init(RIG *rig)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_cleanup(RIG *rig)
+static int primesat_cleanup(RIG *rig)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     int i;
 
     ENTERFUNC;
@@ -335,11 +335,11 @@ static int dummy_cleanup(RIG *rig)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_open(RIG *rig)
+static int primesat_open(RIG *rig)
 {
     ENTERFUNC;
 
-    if (rig->caps->rig_model == RIG_MODEL_DUMMY_NOVFO)
+    if (rig->caps->rig_model == RIG_MODEL_primesat_NOVFO)
     {
         // then we emulate a rig without set_vfo or get_vfo
         rig_debug(RIG_DEBUG_VERBOSE, "%s: Emulating rig without get_vfo or set_vfo\n",
@@ -353,7 +353,7 @@ static int dummy_open(RIG *rig)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_close(RIG *rig)
+static int primesat_close(RIG *rig)
 {
     ENTERFUNC;
 
@@ -362,12 +362,12 @@ static int dummy_close(RIG *rig)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_set_conf(RIG *rig, token_t token, const char *val)
+static int primesat_set_conf(RIG *rig, token_t token, const char *val)
 {
-    struct dummy_priv_data *priv;
+    struct primesat_priv_data *priv;
 
     ENTERFUNC;
-    priv = (struct dummy_priv_data *)rig->state.priv;
+    priv = (struct primesat_priv_data *)rig->state.priv;
 
     switch (token)
     {
@@ -391,12 +391,12 @@ static int dummy_set_conf(RIG *rig, token_t token, const char *val)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_get_conf(RIG *rig, token_t token, char *val)
+static int primesat_get_conf(RIG *rig, token_t token, char *val)
 {
-    struct dummy_priv_data *priv;
+    struct primesat_priv_data *priv;
 
     ENTERFUNC;
-    priv = (struct dummy_priv_data *)rig->state.priv;
+    priv = (struct primesat_priv_data *)rig->state.priv;
 
     switch (token)
     {
@@ -411,9 +411,9 @@ static int dummy_get_conf(RIG *rig, token_t token, char *val)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
+static int primesat_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     char fstr[20];
 
     ENTERFUNC;
@@ -469,13 +469,13 @@ static int dummy_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 }
 
 
-static int dummy_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
+static int primesat_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
 
     ENTERFUNC;
 
-    if (vfo == RIG_VFO_CURR && rig->caps->rig_model != RIG_MODEL_DUMMY_NOVFO) { vfo = priv->curr_vfo; }
+    if (vfo == RIG_VFO_CURR && rig->caps->rig_model != RIG_MODEL_primesat_NOVFO) { vfo = priv->curr_vfo; }
 
     if ((vfo == RIG_VFO_SUB && rig->state.uplink == 1)
             || (vfo == RIG_VFO_MAIN && rig->state.uplink == 2))
@@ -514,9 +514,9 @@ static int dummy_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
 }
 
 
-static int dummy_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
+static int primesat_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
     char buf[16];
 
@@ -579,9 +579,9 @@ static int dummy_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 }
 
 
-static int dummy_get_mode(RIG *rig, vfo_t vfo, rmode_t *mode, pbwidth_t *width)
+static int primesat_get_mode(RIG *rig, vfo_t vfo, rmode_t *mode, pbwidth_t *width)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
 
     ENTERFUNC;
     usleep(CMDSLEEP);
@@ -604,9 +604,9 @@ static int dummy_get_mode(RIG *rig, vfo_t vfo, rmode_t *mode, pbwidth_t *width)
 }
 
 
-static int dummy_set_vfo(RIG *rig, vfo_t vfo)
+static int primesat_set_vfo(RIG *rig, vfo_t vfo)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
 
     ENTERFUNC;
@@ -668,406 +668,190 @@ static int dummy_set_vfo(RIG *rig, vfo_t vfo)
 }
 
 
-static int dummy_get_vfo(RIG *rig, vfo_t *vfo)
+static int primesat_get_vfo(RIG *rig, vfo_t *vfo)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    *vfo = priv->curr_vfo;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
+static int primesat_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-    priv->ptt = ptt;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
+static int primesat_get_ptt(RIG *rig, vfo_t vfo, ptt_t *ptt)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    int rc;
-    int status = 0;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-
-    // sneak a look at the hardware PTT and OR that in with our result
-    // as if it had keyed us
-    switch (rig->state.pttport.type.ptt)
-    {
-    case RIG_PTT_SERIAL_DTR:
-        if (rig->state.pttport.fd >= 0)
-        {
-            if (RIG_OK != (rc = ser_get_dtr(&rig->state.pttport, &status))) { RETURNFUNC(rc); }
-
-            *ptt = status ? RIG_PTT_ON : RIG_PTT_OFF;
-        }
-        else
-        {
-            *ptt = RIG_PTT_OFF;
-        }
-
-        break;
-
-    case RIG_PTT_SERIAL_RTS:
-        if (rig->state.pttport.fd >= 0)
-        {
-            if (RIG_OK != (rc = ser_get_rts(&rig->state.pttport, &status))) { RETURNFUNC(rc); }
-
-            *ptt = status ? RIG_PTT_ON : RIG_PTT_OFF;
-        }
-        else
-        {
-            *ptt = RIG_PTT_OFF;
-        }
-
-        break;
-
-    case RIG_PTT_PARALLEL:
-        if (rig->state.pttport.fd >= 0)
-        {
-            if (RIG_OK != (rc = par_ptt_get(&rig->state.pttport, ptt))) { RETURNFUNC(rc); }
-        }
-
-        break;
-
-    case RIG_PTT_CM108:
-        if (rig->state.pttport.fd >= 0)
-        {
-            if (RIG_OK != (rc = cm108_ptt_get(&rig->state.pttport, ptt))) { RETURNFUNC(rc); }
-        }
-
-        break;
-
-    case RIG_PTT_GPIO:
-    case RIG_PTT_GPION:
-        if (rig->state.pttport.fd >= 0)
-        {
-            if (RIG_OK != (rc = gpio_ptt_get(&rig->state.pttport, ptt))) { RETURNFUNC(rc); }
-        }
-
-        break;
-
-    default:
-        *ptt = priv->ptt;
-        break;
-    }
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_dcd(RIG *rig, vfo_t vfo, dcd_t *dcd)
+static int primesat_get_dcd(RIG *rig, vfo_t vfo, dcd_t *dcd)
 {
-    static int twiddle = 0;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    *dcd = (twiddle++ & 1) ? RIG_DCD_ON : RIG_DCD_OFF;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t rptr_shift)
+static int primesat_set_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t rptr_shift)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    curr->rptr_shift = rptr_shift;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t *rptr_shift)
+static int primesat_get_rptr_shift(RIG *rig, vfo_t vfo, rptr_shift_t *rptr_shift)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    *rptr_shift = curr->rptr_shift;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t rptr_offs)
+static int primesat_set_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t rptr_offs)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    curr->rptr_offs = rptr_offs;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t *rptr_offs)
+static int primesat_get_rptr_offs(RIG *rig, vfo_t vfo, shortfreq_t *rptr_offs)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    *rptr_offs = curr->rptr_offs;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_ctcss_tone(RIG *rig, vfo_t vfo, tone_t tone)
+static int primesat_set_ctcss_tone(RIG *rig, vfo_t vfo, tone_t tone)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    curr->ctcss_tone = tone;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_ctcss_tone(RIG *rig, vfo_t vfo, tone_t *tone)
+static int primesat_get_ctcss_tone(RIG *rig, vfo_t vfo, tone_t *tone)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    *tone = curr->ctcss_tone;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_dcs_code(RIG *rig, vfo_t vfo, tone_t code)
+static int primesat_set_dcs_code(RIG *rig, vfo_t vfo, tone_t code)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    curr->dcs_code = code;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_dcs_code(RIG *rig, vfo_t vfo, tone_t *code)
+static int primesat_get_dcs_code(RIG *rig, vfo_t vfo, tone_t *code)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    *code = curr->dcs_code;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_ctcss_sql(RIG *rig, vfo_t vfo, tone_t tone)
+static int primesat_set_ctcss_sql(RIG *rig, vfo_t vfo, tone_t tone)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    curr->ctcss_sql = tone;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_ctcss_sql(RIG *rig, vfo_t vfo, tone_t *tone)
+static int primesat_get_ctcss_sql(RIG *rig, vfo_t vfo, tone_t *tone)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    *tone = curr->ctcss_sql;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_dcs_sql(RIG *rig, vfo_t vfo, unsigned int code)
+static int primesat_set_dcs_sql(RIG *rig, vfo_t vfo, unsigned int code)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    curr->dcs_sql = code;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_dcs_sql(RIG *rig, vfo_t vfo, unsigned int *code)
+static int primesat_get_dcs_sql(RIG *rig, vfo_t vfo, unsigned int *code)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    *code = curr->dcs_sql;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
+static int primesat_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    int retval;
-
     ENTERFUNC;
-
-    retval = dummy_set_freq(rig, vfo, tx_freq);
-    priv->curr->tx_freq = tx_freq;
-    rig_debug(RIG_DEBUG_VERBOSE, "%s: priv->curr->tx_freq = %.0f\n", __func__,
-              priv->curr->tx_freq);
-
-    RETURNFUNC(retval);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_split_freq(RIG *rig, vfo_t vfo, freq_t *tx_freq)
+static int primesat_get_split_freq(RIG *rig, vfo_t vfo, freq_t *tx_freq)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-
-    *tx_freq = priv->curr->tx_freq;
-    rig_debug(RIG_DEBUG_VERBOSE, "%s: priv->curr->tx_freq = %.0f\n", __func__,
-              priv->curr->tx_freq);
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_set_split_mode(RIG *rig, vfo_t vfo, rmode_t tx_mode,
+static int primesat_set_split_mode(RIG *rig, vfo_t vfo, rmode_t tx_mode,
                                 pbwidth_t tx_width)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-
-    curr->tx_mode = tx_mode;
-
-    if (RIG_PASSBAND_NOCHANGE == tx_width) { RETURNFUNC(RIG_OK); }
-
-    curr->tx_width = tx_width;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_get_split_mode(RIG *rig, vfo_t vfo, rmode_t *tx_mode,
+static int primesat_get_split_mode(RIG *rig, vfo_t vfo, rmode_t *tx_mode,
                                 pbwidth_t *tx_width)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-
-    *tx_mode = curr->tx_mode;
-    *tx_width = curr->tx_width;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_set_split_vfo(RIG *rig, vfo_t vfo, split_t split, vfo_t tx_vfo)
+static int primesat_set_split_vfo(RIG *rig, vfo_t vfo, split_t split, vfo_t tx_vfo)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    rig_debug(RIG_DEBUG_VERBOSE, "%s: split=%d, vfo=%s, tx_vfo=%s\n",
-              __func__, split, rig_strvfo(vfo), rig_strvfo(tx_vfo));
-    curr->split = split;
-    priv->tx_vfo = tx_vfo;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_split_vfo(RIG *rig, vfo_t vfo, split_t *split,
+static int primesat_get_split_vfo(RIG *rig, vfo_t vfo, split_t *split,
                                vfo_t *tx_vfo)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    *split = curr->split;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_set_rit(RIG *rig, vfo_t vfo, shortfreq_t rit)
+static int primesat_set_rit(RIG *rig, vfo_t vfo, shortfreq_t rit)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    curr->rit = rit;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_rit(RIG *rig, vfo_t vfo, shortfreq_t *rit)
+static int primesat_get_rit(RIG *rig, vfo_t vfo, shortfreq_t *rit)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    *rit = curr->rit;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_xit(RIG *rig, vfo_t vfo, shortfreq_t xit)
+static int primesat_set_xit(RIG *rig, vfo_t vfo, shortfreq_t xit)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    curr->xit = xit;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_xit(RIG *rig, vfo_t vfo, shortfreq_t *xit)
+static int primesat_get_xit(RIG *rig, vfo_t vfo, shortfreq_t *xit)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    *xit = curr->xit;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_ts(RIG *rig, vfo_t vfo, shortfreq_t ts)
+static int primesat_set_ts(RIG *rig, vfo_t vfo, shortfreq_t ts)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
 
     ENTERFUNC;
@@ -1077,9 +861,9 @@ static int dummy_set_ts(RIG *rig, vfo_t vfo, shortfreq_t ts)
 }
 
 
-static int dummy_get_ts(RIG *rig, vfo_t vfo, shortfreq_t *ts)
+static int primesat_get_ts(RIG *rig, vfo_t vfo, shortfreq_t *ts)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
 
     ENTERFUNC;
@@ -1089,9 +873,9 @@ static int dummy_get_ts(RIG *rig, vfo_t vfo, shortfreq_t *ts)
 }
 
 
-static int dummy_set_func(RIG *rig, vfo_t vfo, setting_t func, int status)
+static int primesat_set_func(RIG *rig, vfo_t vfo, setting_t func, int status)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
 
     ENTERFUNC;
@@ -1111,9 +895,9 @@ static int dummy_set_func(RIG *rig, vfo_t vfo, setting_t func, int status)
 }
 
 
-static int dummy_get_func(RIG *rig, vfo_t vfo, setting_t func, int *status)
+static int primesat_get_func(RIG *rig, vfo_t vfo, setting_t func, int *status)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
 
     ENTERFUNC;
@@ -1126,166 +910,22 @@ static int dummy_get_func(RIG *rig, vfo_t vfo, setting_t func, int *status)
 }
 
 
-static int dummy_set_level(RIG *rig, vfo_t vfo, setting_t level, value_t val)
+static int primesat_set_level(RIG *rig, vfo_t vfo, setting_t level, value_t val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-    int idx;
-    char lstr[32];
-
     ENTERFUNC;
-    idx = rig_setting2idx(level);
-
-    if (idx >= RIG_SETTING_MAX)
-    {
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    curr->levels[idx] = val;
-
-    if (RIG_LEVEL_IS_FLOAT(level))
-    {
-        SNPRINTF(lstr, sizeof(lstr), "%f", val.f);
-    }
-    else
-    {
-        SNPRINTF(lstr, sizeof(lstr), "%d", val.i);
-    }
-
-    rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s %s\n", __func__,
-              rig_strlevel(level), lstr);
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
+static int primesat_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-    int idx;
-
     ENTERFUNC;
-    idx = rig_setting2idx(level);
-
-    if (idx >= RIG_SETTING_MAX)
-    {
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    switch (level)
-    {
-    case RIG_LEVEL_STRENGTH:
-    case RIG_LEVEL_RAWSTR:
-        if (priv->static_data)
-        {
-            curr->levels[idx].i = -12;
-        }
-        else
-        {
-            uint64_t level1, level2;
-            /* make S-Meter jiggle */
-            int qrm = -56;
-
-            if (curr->freq < MHz(7))
-            {
-                qrm = -20;
-            }
-            else if (curr->freq < MHz(21))
-            {
-                qrm = -30;
-            }
-            else if (curr->freq < MHz(50))
-            {
-                qrm = -50;
-            }
-
-            // cppcheck-suppress *
-            level1 = LVL_ATT;
-            level2 = LVL_PREAMP;
-            curr->levels[idx].i = qrm + (time(NULL) % 32) + (rand() % 4)
-                                  - curr->levels[level1].i + curr->levels[level2].i;
-        }
-
-        break;
-
-    case RIG_LEVEL_RFPOWER_METER:
-        if (priv->static_data)
-        {
-            curr->levels[idx].f = 0.5f;
-        }
-        else
-        {
-            curr->levels[idx].f = (float)(time(NULL) % 32) / 64.0f + (float)(
-                                      rand() % 4) / 8.0f;
-        }
-
-        break;
-
-    case RIG_LEVEL_RFPOWER_METER_WATTS:
-        if (priv->static_data)
-        {
-            curr->levels[idx].f = 50.0f;
-        }
-        else
-        {
-            curr->levels[idx].f = (float)(time(NULL) % 32) / 64.0f + (float)(
-                                      rand() % 4) / 8.0f;
-            curr->levels[idx].f *= 100.0f;
-        }
-
-        break;
-
-    case RIG_LEVEL_COMP_METER:
-        if (priv->static_data)
-        {
-            curr->levels[idx].f = 3.5f;
-        }
-        else
-        {
-            curr->levels[idx].f = 0.5f + (float)(time(NULL) % 32) / 16.0f + (float)(
-                                      rand() % 200) / 20.0f;
-        }
-
-        break;
-
-    case RIG_LEVEL_VD_METER:
-        if (priv->static_data)
-        {
-            curr->levels[idx].f = 13.82f;
-        }
-        else
-        {
-            curr->levels[idx].f = 13.82f + (float)(time(NULL) % 10) / 50.0f - (float)(
-                                      rand() % 10) / 40.0f;
-        }
-
-        break;
-
-    case RIG_LEVEL_ID_METER:
-        if (priv->static_data)
-        {
-            curr->levels[idx].f = 0.85f;
-        }
-        else
-        {
-            curr->levels[idx].f = 2.0f + (float)(time(NULL) % 320) / 16.0f - (float)(
-                                      rand() % 40) / 20.0f;
-        }
-
-        break;
-    }
-
-    memcpy(val, &curr->levels[idx], sizeof(value_t));
-    rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s\n", __func__,
-              rig_strlevel(level));
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_set_ext_level(RIG *rig, vfo_t vfo, token_t token, value_t val)
+static int primesat_set_ext_level(RIG *rig, vfo_t vfo, token_t token, value_t val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
     char lstr[64];
     const struct confparams *cfp;
@@ -1353,9 +993,9 @@ static int dummy_set_ext_level(RIG *rig, vfo_t vfo, token_t token, value_t val)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_get_ext_level(RIG *rig, vfo_t vfo, token_t token, value_t *val)
+static int primesat_get_ext_level(RIG *rig, vfo_t vfo, token_t token, value_t *val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
     const struct confparams *cfp;
     struct ext_list *elp;
@@ -1397,9 +1037,9 @@ static int dummy_get_ext_level(RIG *rig, vfo_t vfo, token_t token, value_t *val)
 }
 
 
-static int dummy_set_ext_func(RIG *rig, vfo_t vfo, token_t token, int status)
+static int primesat_set_ext_func(RIG *rig, vfo_t vfo, token_t token, int status)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     const struct confparams *cfp;
     struct ext_list *elp;
 
@@ -1449,9 +1089,9 @@ static int dummy_set_ext_func(RIG *rig, vfo_t vfo, token_t token, int status)
 }
 
 
-static int dummy_get_ext_func(RIG *rig, vfo_t vfo, token_t token, int *status)
+static int primesat_get_ext_func(RIG *rig, vfo_t vfo, token_t token, int *status)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     const struct confparams *cfp;
     struct ext_list *elp;
 
@@ -1489,31 +1129,23 @@ static int dummy_get_ext_func(RIG *rig, vfo_t vfo, token_t token, int *status)
 }
 
 
-static int dummy_set_powerstat(RIG *rig, powerstat_t status)
+static int primesat_set_powerstat(RIG *rig, powerstat_t status)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-    priv->powerstat = status;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_powerstat(RIG *rig, powerstat_t *status)
+static int primesat_get_powerstat(RIG *rig, powerstat_t *status)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-    *status = priv->powerstat;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_parm(RIG *rig, setting_t parm, value_t val)
+static int primesat_set_parm(RIG *rig, setting_t parm, value_t val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     int idx;
     char pstr[32];
 
@@ -1542,9 +1174,9 @@ static int dummy_set_parm(RIG *rig, setting_t parm, value_t val)
 }
 
 
-static int dummy_get_parm(RIG *rig, setting_t parm, value_t *val)
+static int primesat_get_parm(RIG *rig, setting_t parm, value_t *val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     int idx;
 
     ENTERFUNC;
@@ -1562,9 +1194,9 @@ static int dummy_get_parm(RIG *rig, setting_t parm, value_t *val)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_set_ext_parm(RIG *rig, token_t token, value_t val)
+static int primesat_set_ext_parm(RIG *rig, token_t token, value_t val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     char lstr[64];
     const struct confparams *cfp;
     struct ext_list *epp;
@@ -1629,9 +1261,9 @@ static int dummy_set_ext_parm(RIG *rig, token_t token, value_t val)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_get_ext_parm(RIG *rig, token_t token, value_t *val)
+static int primesat_get_ext_parm(RIG *rig, token_t token, value_t *val)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     const struct confparams *cfp;
     struct ext_list *epp;
 
@@ -1672,139 +1304,55 @@ static int dummy_get_ext_parm(RIG *rig, token_t token, value_t *val)
 
 
 
-static int dummy_set_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t option)
+static int primesat_set_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t option)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
     ENTERFUNC;
-
-    switch (ant)
-    {
-    case RIG_ANT_CURR:
-        break;
-
-    case RIG_ANT_1:
-    case RIG_ANT_2:
-    case RIG_ANT_3:
-    case RIG_ANT_4:
-        curr->ant = ant;
-        break;
-
-    default:
-        rig_debug(RIG_DEBUG_ERR, "%s: unknown antenna requested=0x%02x\n", __func__,
-                  ant);
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    priv->ant_option[rig_setting2idx(curr->ant)] = option.i;
-    rig_debug(RIG_DEBUG_VERBOSE,
-              "%s called ant=0x%02x, option=%d, curr->ant=0x%02x\n", __func__, ant, option.i,
-              curr->ant);
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t *option,
+static int primesat_get_ant(RIG *rig, vfo_t vfo, ant_t ant, value_t *option,
                          ant_t *ant_curr, ant_t *ant_tx, ant_t *ant_rx)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
     ENTERFUNC;
-
-    rig_debug(RIG_DEBUG_VERBOSE, "%s called, ant=0x%02x\n", __func__, ant);
-
-    switch (ant)
-    {
-    case RIG_ANT_CURR:
-        *ant_curr = curr->ant;
-        break;
-
-    case RIG_ANT_1:
-    case RIG_ANT_2:
-    case RIG_ANT_3:
-    case RIG_ANT_4:
-        *ant_curr = ant;
-        break;
-
-    default:
-        rig_debug(RIG_DEBUG_ERR, "%s: unknown antenna requested=0x%02x\n", __func__,
-                  ant);
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    rig_debug(RIG_DEBUG_TRACE, "%s: ant_curr=0x%02x, idx=%d\n", __func__, *ant_curr,
-              rig_setting2idx(*ant_curr));
-    option->i = priv->ant_option[rig_setting2idx(*ant_curr)];
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_bank(RIG *rig, vfo_t vfo, int bank)
+static int primesat_set_bank(RIG *rig, vfo_t vfo, int bank)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-    priv->bank = bank;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_mem(RIG *rig, vfo_t vfo, int ch)
+static int primesat_set_mem(RIG *rig, vfo_t vfo, int ch)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-
-    if (ch < 0 || ch >= NB_CHAN)
-    {
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    if (priv->curr_vfo == RIG_VFO_MEM)
-    {
-        priv->curr = &priv->mem[ch];
-    }
-    else
-    {
-        priv->curr->channel_num = ch;
-    }
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_mem(RIG *rig, vfo_t vfo, int *ch)
+static int primesat_get_mem(RIG *rig, vfo_t vfo, int *ch)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
-    *ch = curr->channel_num;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_scan(RIG *rig, vfo_t vfo, scan_t scan, int ch)
+static int primesat_scan(RIG *rig, vfo_t vfo, scan_t scan, int ch)
 {
     ENTERFUNC;
-    rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s %d\n", __func__,
-              rig_strscan(scan), ch);
-    /* TODO: change freq, etc. */
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 static void chan_vfo(channel_t *chan, vfo_t vfo)
 {
-    chan->vfo = vfo;
-    strcpy(chan->channel_desc, rig_strvfo(vfo));
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
+static int primesat_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
+    struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     channel_t *curr = priv->curr;
     int ret;
     freq_t freq;
@@ -1873,7 +1421,7 @@ static int dummy_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
     case RIG_OP_XCHG: /* Exchange VFO A/B */
     {
         channel_t chan;
-        chan.ext_levels = alloc_init_ext(dummy_ext_levels);
+        chan.ext_levels = alloc_init_ext(primesat_ext_levels);
 
         if (!chan.ext_levels)
         {
@@ -1928,11 +1476,11 @@ static int dummy_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
     case RIG_OP_TOGGLE:
         if (priv->curr_vfo == RIG_VFO_A)
         {
-            RETURNFUNC(dummy_set_vfo(rig, RIG_VFO_B));
+            RETURNFUNC(primesat_set_vfo(rig, RIG_VFO_B));
         }
         else if (priv->curr_vfo == RIG_VFO_B)
         {
-            RETURNFUNC(dummy_set_vfo(rig, RIG_VFO_A));
+            RETURNFUNC(primesat_set_vfo(rig, RIG_VFO_A));
         }
         else
         {
@@ -1950,27 +1498,27 @@ static int dummy_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
         RETURNFUNC(-RIG_ENIMPL);
 
     case RIG_OP_UP:
-        ret = dummy_get_freq(rig, vfo, &freq);
+        ret = primesat_get_freq(rig, vfo, &freq);
 
         if (!ret) { break; }
 
-        ret = dummy_get_ts(rig, vfo, &ts);
+        ret = primesat_get_ts(rig, vfo, &ts);
 
         if (!ret) { break; }
 
-        dummy_set_freq(rig, vfo, freq + ts);  /* up */
+        primesat_set_freq(rig, vfo, freq + ts);  /* up */
         break;
 
     case RIG_OP_DOWN:
-        ret = dummy_get_freq(rig, vfo, &freq);
+        ret = primesat_get_freq(rig, vfo, &freq);
 
         if (!ret) { break; }
 
-        ret = dummy_get_ts(rig, vfo, &ts);
+        ret = primesat_get_ts(rig, vfo, &ts);
 
         if (!ret) { break; }
 
-        dummy_set_freq(rig, vfo, freq - ts);  /* down */
+        primesat_set_freq(rig, vfo, freq - ts);  /* down */
         break;
 
     default:
@@ -1980,310 +1528,130 @@ static int dummy_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
     RETURNFUNC(RIG_OK);
 }
 
-static int dummy_set_channel(RIG *rig, vfo_t vfo, const channel_t *chan)
+static int primesat_set_channel(RIG *rig, vfo_t vfo, const channel_t *chan)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-
-    if (!chan->ext_levels)
-    {
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    if (chan->channel_num < 0 || chan->channel_num >= NB_CHAN)
-    {
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    /* TODO:
-     * - check ext_levels is the right length
-     */
-    switch (chan->vfo)
-    {
-    case RIG_VFO_MEM:
-        copy_chan(&priv->mem[chan->channel_num], chan);
-        break;
-
-    case RIG_VFO_A:
-        copy_chan(&priv->vfo_a, chan);
-        break;
-
-    case RIG_VFO_B:
-        copy_chan(&priv->vfo_b, chan);
-        break;
-
-    case RIG_VFO_CURR:
-        copy_chan(priv->curr, chan);
-        break;
-
-    default:
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_channel(RIG *rig, vfo_t vfo, channel_t *chan,
+static int primesat_get_channel(RIG *rig, vfo_t vfo, channel_t *chan,
                              int read_only)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
     ENTERFUNC;
-
-    if (chan->channel_num < 0 || chan->channel_num >= NB_CHAN)
-    {
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    if (!chan->ext_levels)
-    {
-        chan->ext_levels = alloc_init_ext(dummy_ext_levels);
-
-        if (!chan->ext_levels)
-        {
-            RETURNFUNC(-RIG_ENOMEM);
-        }
-    }
-
-    /* TODO:
-     * - check ext_levels is the right length
-     */
-    switch (chan->vfo)
-    {
-    case RIG_VFO_MEM:
-        copy_chan(chan, &priv->mem[chan->channel_num]);
-        break;
-
-    case RIG_VFO_A:
-        copy_chan(chan, &priv->vfo_a);
-        break;
-
-    case RIG_VFO_B:
-        copy_chan(chan, &priv->vfo_b);
-        break;
-
-    case RIG_VFO_CURR:
-        copy_chan(chan, priv->curr);
-        break;
-
-    default:
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_set_trn(RIG *rig, int trn)
+static int primesat_set_trn(RIG *rig, int trn)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
 
-    priv->trn = trn;
-
-    RETURNFUNC2(RIG_OK);
+    RETURNFUNC2(-RIG_ENAVAIL);
 }
 
 
-static int dummy_get_trn(RIG *rig, int *trn)
+static int primesat_get_trn(RIG *rig, int *trn)
 {
-    struct dummy_priv_data *priv = (struct dummy_priv_data *)rig->state.priv;
-
-    *trn = priv->trn;
-
-    RETURNFUNC2(RIG_OK);
+    RETURNFUNC2(-RIG_ENAVAIL);
 }
 
-static const char *dummy_get_info(RIG *rig)
+static const char *primesat_get_info(RIG *rig)
 {
-    return "Nothing much (dummy)";
+    return "Nothing much (primesat)";
 }
 
 
-static int dummy_send_dtmf(RIG *rig, vfo_t vfo, const char *digits)
+static int primesat_send_dtmf(RIG *rig, vfo_t vfo, const char *digits)
 {
     ENTERFUNC;
-    rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s\n", __func__, digits);
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_recv_dtmf(RIG *rig, vfo_t vfo, char *digits, int *length)
+static int primesat_recv_dtmf(RIG *rig, vfo_t vfo, char *digits, int *length)
 {
     ENTERFUNC;
-    strcpy(digits, "0123456789ABCDEF");
-    *length = 16;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_send_morse(RIG *rig, vfo_t vfo, const char *msg)
+static int primesat_send_morse(RIG *rig, vfo_t vfo, const char *msg)
 {
     ENTERFUNC;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_stop_morse(RIG *rig, vfo_t vfo)
+static int primesat_stop_morse(RIG *rig, vfo_t vfo)
 {
     ENTERFUNC;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_send_voice_mem(RIG *rig, vfo_t vfo, int ch)
+static int primesat_send_voice_mem(RIG *rig, vfo_t vfo, int ch)
 {
     ENTERFUNC;
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int dummy_power2mW(RIG *rig, unsigned int *mwpower, float power,
+static int primesat_power2mW(RIG *rig, unsigned int *mwpower, float power,
                           freq_t freq, rmode_t mode)
 {
     ENTERFUNC;
-    rig_debug(RIG_DEBUG_TRACE, "%s: passed power = %f\n", __func__, power);
-    rig_debug(RIG_DEBUG_TRACE, "%s: passed freq = %"PRIfreq" Hz\n", __func__, freq);
-    rig_debug(RIG_DEBUG_TRACE, "%s: passed mode = %s\n", __func__,
-              rig_strrmode(mode));
-
-    /* Pretend this is a 100W radio */
-    *mwpower = (power * 100000);
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
-static int dummy_mW2power(RIG *rig, float *power, unsigned int mwpower,
+static int primesat_mW2power(RIG *rig, float *power, unsigned int mwpower,
                           freq_t freq, rmode_t mode)
 {
     ENTERFUNC;
-    rig_debug(RIG_DEBUG_TRACE, "%s: passed mwpower = %u\n", __func__, mwpower);
-    rig_debug(RIG_DEBUG_TRACE, "%s: passed freq = %"PRIfreq" Hz\n", __func__, freq);
-    rig_debug(RIG_DEBUG_TRACE, "%s: passed mode = %s\n", __func__,
-              rig_strrmode(mode));
-
-    /* Pretend this is a 100W radio */
-    if (mwpower > 100000)
-    {
-        RETURNFUNC(-RIG_EINVAL);
-    }
-
-    *power = ((float)mwpower / 100000);
-
-    RETURNFUNC(RIG_OK);
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-static int m_year, m_month, m_day, m_hour, m_min, m_sec, m_utc_offset;
-static double m_msec;
+//static int m_year, m_month, m_day, m_hour, m_min, m_sec, m_utc_offset;
+//static double m_msec;
 
-int dummy_set_clock(RIG *rig, int year, int month, int day, int hour, int min,
+int primesat_set_clock(RIG *rig, int year, int month, int day, int hour, int min,
                     int sec, double msec, int utc_offset)
 {
-    int retval = RIG_OK;
-
-    rig_debug(RIG_DEBUG_VERBOSE, "%s: %04d-%02d-%02dT%02d:%02d:%02d.%.03f%s%02d\n",
-              __func__, year,
-              month, day, hour, min, sec, msec, utc_offset >= 0 ? "+" : "-",
-              (unsigned)(abs(utc_offset)));
-    m_year = year;
-    m_month = month;
-    m_day = day;
-
-    if (hour >= 0)
-    {
-        m_hour = hour;
-        m_min = min;
-        m_sec = sec;
-        m_msec = msec;
-        m_utc_offset = utc_offset;
-    }
-
-    return retval;
+    ENTERFUNC;
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
-int dummy_get_clock(RIG *rig, int *year, int *month, int *day, int *hour,
+int primesat_get_clock(RIG *rig, int *year, int *month, int *day, int *hour,
                     int *min, int *sec, double *msec, int *utc_offset)
 {
-    int retval = RIG_OK;
-
-    *year = m_year;
-    *month = m_month;
-    *day = m_day;
-    *hour = m_hour;
-    *min = m_min;
-    *sec = m_sec;
-    *msec = m_msec;
-    *utc_offset = m_utc_offset;
-
-    rig_debug(RIG_DEBUG_VERBOSE,
-              "%s: %02d-%02d-%02dT%02d:%02d:%02d:%0.3lf%s%02d\n'",
-              __func__, *year, *month, *day, *hour, *min, *sec, *msec,
-              *utc_offset >= 0 ? "+" : "-", (unsigned)abs(*utc_offset));
-    return retval;
+    ENTERFUNC;
+    RETURNFUNC(-RIG_ENAVAIL);
 }
 
 
 /*
- * Dummy rig capabilities.
+ * primesat rig capabilities.
  */
 
 /*
  * The following macros set bitmasks for the various funcs, levels, parms,
- * etc.  This dummy backend claims support for almost all of them.
+ * etc.  This primesat backend claims support for almost all of them.
  */
-#define DUMMY_FUNC  ((setting_t)-1ULL) /* All possible functions */
-#define DUMMY_LEVEL (((setting_t)-1ULL)&~(1ULL<<27)) /* All levels except SQLSTAT */
-#define DUMMY_PARM  ((setting_t)-1ULL) /* All possible parms */
+//#define primesat_FUNC  ((setting_t)-1ULL) /* All possible functions */
+//#define primesat_LEVEL (((setting_t)-1ULL)&~(1ULL<<27)) /* All levels except SQLSTAT */
+#define primesat_PARM  ((setting_t)-1ULL) /* All possible parms */
+#define primesat_VFO_OP  (RIG_OP_CPY | RIG_OP_XCHG) /* All possible VFO OPs */
+#define primesat_VFOS (RIG_VFO_MAIN|RIG_VFO_SUB)
+#define primesat_MODES (RIG_MODE_LSB | RIG_MODE_USB | RIG_MODE_FM | \
+                     RIG_MODE_FMN | RIG_MODE_AM | RIG_MODE_CW | \
+                     RIG_MODE_CWR)
 
-#define DUMMY_VFO_OP  0x7ffffffUL /* All possible VFO OPs */
-#define DUMMY_SCAN    0x7ffffffUL /* All possible scan OPs */
-
-#define DUMMY_VFOS (RIG_VFO_TX|RIG_VFO_TX|RIG_VFO_A|RIG_VFO_B|RIG_VFO_C|RIG_VFO_MEM|RIG_VFO_MAIN|RIG_VFO_SUB|RIG_VFO_MAIN_A|RIG_VFO_MAIN_B|RIG_VFO_SUB_A|RIG_VFO_SUB_B)
-
-#define DUMMY_MODES (RIG_MODE_AM | RIG_MODE_CW | RIG_MODE_RTTY | \
-                     RIG_MODE_SSB | RIG_MODE_FM | RIG_MODE_WFM | \
-                     RIG_MODE_CWR | RIG_MODE_RTTYR)
-
-#define DUMMY_MEM_CAP {    \
-    .bank_num = 1,  \
-    .vfo = 1,   \
-    .ant = 1,   \
-    .freq = 1,  \
-    .mode = 1,  \
-    .width = 1, \
-    .tx_freq = 1,   \
-    .tx_mode = 1,   \
-    .tx_width = 1,  \
-    .split = 1, \
-    .rptr_shift = 1,    \
-    .rptr_offs = 1, \
-    .tuning_step = 1,   \
-    .rit = 1,   \
-    .xit = 1,   \
-    .funcs = DUMMY_FUNC,    \
-    .levels = RIG_LEVEL_SET(DUMMY_LEVEL),   \
-    .ctcss_tone = 1,    \
-    .ctcss_sql = 1, \
-    .dcs_code = 1,  \
-    .dcs_sql = 1,   \
-    .scan_group = 1,    \
-    .flags = 1, \
-    .channel_desc = 1,  \
-    .ext_levels = 1,    \
-    }
-
-struct rig_caps dummy_caps =
+struct rig_caps primecontroller_caps =
 {
     RIG_MODEL(RIG_MODEL_PRIMECONTROLLER),
-    .model_name =     "Primecontroller",
-    .mfg_name =       "Primesat",
+    .model_name =     "PrimeSat Controller",
+    .mfg_name =       "PrimeTec",
     .version =        "20230520.0",
     .copyright =      "LGPL",
     .status =         RIG_STATUS_ALPHA,
     .rig_type =       RIG_TYPE_OTHER,
-    .targetable_vfo = RIG_TARGETABLE_FREQ | RIG_TARGETABLE_MODE,
+    //.targetable_vfo = RIG_TARGETABLE_FREQ | RIG_TARGETABLE_MODE,
+    .targetable_vfo = RIG_TARGETABLE_NONE,
     .ptt_type =       RIG_PTT_NONE,
     .dcd_type =       RIG_DCD_NONE,
     .port_type =      RIG_PORT_SERIAL,
@@ -2292,81 +1660,52 @@ struct rig_caps dummy_caps =
     .serial_rate_max = 9600,
     .serial_data_bits = 8,
     .serial_stop_bits = 1,
-    .serial_handshake = RIG_HANDSHAKE_NONE
+    .serial_handshake = RIG_HANDSHAKE_NONE,
     .write_delay =    0,
     .post_write_delay = 0,
     .timeout =    1000,
     .retry =    3,
 
     .has_get_func =   RIG_FUNC_NONE,
-    .has_set_func =   DUMMY_FUNC,
+    .has_set_func =   RIG_FUNC_NONE,
     .has_get_level =  RIG_LEVEL_NONE,
     .has_set_level =  RIG_LEVEL_NONE,
-    .has_get_parm =    DUMMY_PARM,
-    .has_set_parm =    RIG_PARM_SET(DUMMY_PARM),
-    .level_gran =      {
-        [LVL_RF]            = { .min = { .f = 0 },     .max = { .f = 1.0f },  .step = { .f = 1.0f/255.0f } },
-        [LVL_RFPOWER]       = { .min = { .f = .05f },   .max = { .f = 1 },    .step = { .f = 1.0f/511.0f } },
-        [LVL_RFPOWER_METER] = { .min = { .f = .0f },    .max = { .f = 1 },    .step = { .f = 1.0f/255.0f } },
-        [LVL_RFPOWER_METER_WATTS] = { .min = { .f = .0f },    .max = { .f = 100 },    .step = { .f = 1.0f/255.0f } },
-        [LVL_CWPITCH] = { .step = { .i = 10 } },
-        [LVL_SPECTRUM_SPEED] = {.min = {.i = 0}, .max = {.i = 2}, .step = {.i = 1}},
-        [LVL_SPECTRUM_REF] = {.min = {.f = -30.0f}, .max = {.f = 10.0f}, .step = {.f = 0.5f}},
-        [LVL_SPECTRUM_AVG] = {.min = {.i = 0}, .max = {.i = 3}, .step = {.i = 1}},
-    },
-    .ctcss_list =      common_ctcss_list,
-    .dcs_list =        full_dcs_list,
+    .has_get_parm =    primesat_PARM,
+    .has_set_parm =    RIG_PARM_SET(primesat_PARM),
+    .level_gran =      { },
+    .ctcss_list =  0,
+    .dcs_list =     0,
     .chan_list =   {
-        {   0,  18, RIG_MTYPE_MEM, DUMMY_MEM_CAP },
-        {  19,  19, RIG_MTYPE_CALL },
-        {  20,  NB_CHAN - 1, RIG_MTYPE_EDGE },
         RIG_CHAN_END,
     },
-    .scan_ops =    DUMMY_SCAN,
-    .vfo_ops =     DUMMY_VFO_OP,
+    .scan_ops =    RIG_SCAN_NONE,
+    .vfo_ops =     primesat_VFO_OP,
     .transceive =     RIG_TRN_OFF,
-    .attenuator =     { 10, 20, 30, RIG_DBLST_END, },
-    .preamp =          { 10, RIG_DBLST_END, },
+    .attenuator =     { RIG_DBLST_END, },
+    .preamp =          { RIG_DBLST_END, },
     .agc_level_count = 1,
     .agc_levels = {RIG_AGC_NONE},
     .rx_range_list1 =  { {
-            .startf = kHz(150), .endf = MHz(1500), .modes = DUMMY_MODES,
-            .low_power = -1, .high_power = -1, DUMMY_VFOS, RIG_ANT_1 | RIG_ANT_2 | RIG_ANT_3 | RIG_ANT_4,
-            .label = "Dummy#1"
+            .startf = Hz(0), .endf = MHz(9999.999999), .modes = primesat_MODES,
+            .low_power = -1, .high_power = -1, primesat_VFOS, RIG_ANT_NONE,
+            .label = "Primesat Controller RX range."
         },
         RIG_FRNG_END,
     },
     .tx_range_list1 =  { {
-            .startf = kHz(150), .endf = MHz(1500), .modes = DUMMY_MODES,
-            .low_power = W(5), .high_power = W(100), DUMMY_VFOS, RIG_ANT_1 | RIG_ANT_2 | RIG_ANT_3 | RIG_ANT_4,
-            .label = "Dummy#1"
+            .startf = Hz(0), .endf = MHz(9999.999999), .modes = primesat_MODES,
+            .low_power = -1, .high_power = -1, primesat_VFOS, RIG_ANT_NONE,
+            .label = "Primesat Controller TX range"
         },
         RIG_FRNG_END,
     },
-    .rx_range_list2 =  { {
-            .startf = kHz(150), .endf = MHz(1500), .modes = DUMMY_MODES,
-            .low_power = -1, .high_power = -1, DUMMY_VFOS, RIG_ANT_1 | RIG_ANT_2 | RIG_ANT_3 | RIG_ANT_4,
-            .label = "Dummy#2"
-        },
-        RIG_FRNG_END,
-    },
-    .tx_range_list2 =  { RIG_FRNG_END, },
-    .tuning_steps =  { {DUMMY_MODES, 1}, {DUMMY_MODES, RIG_TS_ANY}, RIG_TS_END, },
-    .filters =  { RIG_FLT_END
-    },
-    .max_rit = 9990,
-    .max_xit = 9990,
-    .max_ifshift = 10000,
+    .tuning_steps =  { {primesat_MODES, 1}, RIG_TS_END, },
+    .filters =  { RIG_FLT_END },
+    .max_rit = 0,
+    .max_xit = 0,
+    .max_ifshift = 0,
 
     .spectrum_scopes = {
-        {
-            .id = 0,
-            .name = "Main",
-        },
-        {
-            .id = 1,
-            .name = "Sub",
-        },
         {
             .id = -1,
             .name = NULL,
@@ -2376,125 +1715,103 @@ struct rig_caps dummy_caps =
         RIG_SPECTRUM_MODE_NONE
     },
     .spectrum_spans = {
-        5000,
-        10000,
-        20000,
-        50000,
-        100000,
-        200000,
-        500000,
-        1000000,
-        2000000,
-        5000000,
         0,
     },
     .spectrum_avg_modes = {
         {
-            .id = 0,
-            .name = "OFF",
-        },
-        {
-            .id = 1,
-            .name = "2",
-        },
-        {
-            .id = 2,
-            .name = "3",
-        },
-        {
-            .id = 3,
-            .name = "4",
+            .id = -1,
+            .name = NULL,
         },
     },
-    .spectrum_attenuator = { 10, 20, 30, RIG_DBLST_END, },
+    .spectrum_attenuator = { RIG_DBLST_END, },
 
     .priv =  NULL,    /* priv */
 
-    .extlevels =    dummy_ext_levels,
-    .extfuncs =     dummy_ext_funcs,
-    .extparms =     dummy_ext_parms,
-    .cfgparams =    dummy_cfg_params,
+    .extlevels =    primesat_ext_levels,
+    .extfuncs =     primesat_ext_funcs,
+    .extparms =     primesat_ext_parms,
+    .cfgparams =    primesat_cfg_params,
 
-    .rig_init =     dummy_init,
-    .rig_cleanup =  dummy_cleanup,
-    .rig_open =     dummy_open,
-    .rig_close =    dummy_close,
+    .rig_init =     primesat_init,
+    .rig_cleanup =  primesat_cleanup,
+    .rig_open =     primesat_open,
+    .rig_close =    primesat_close,
 
-    .set_conf =     dummy_set_conf,
-    .get_conf =     dummy_get_conf,
+    .set_conf =     primesat_set_conf,
+    .get_conf =     primesat_get_conf,
 
-    .set_freq =     dummy_set_freq,
-    .get_freq =     dummy_get_freq,
-    .set_mode =     dummy_set_mode,
-    .get_mode =     dummy_get_mode,
-    .set_vfo =      dummy_set_vfo,
-    .get_vfo =      dummy_get_vfo,
+    .set_freq =     primesat_set_freq,
+    .get_freq =     primesat_get_freq,
+    .set_mode =     primesat_set_mode,
+    .get_mode =     primesat_get_mode,
+    .set_vfo =      primesat_set_vfo,
+    .get_vfo =      primesat_get_vfo,
 
-    .set_powerstat =  dummy_set_powerstat,
-    .get_powerstat =  dummy_get_powerstat,
-    .set_level =     dummy_set_level,
-    .get_level =     dummy_get_level,
-    .set_func =      dummy_set_func,
-    .get_func =      dummy_get_func,
-    .set_parm =      dummy_set_parm,
-    .get_parm =      dummy_get_parm,
-    .set_ext_level = dummy_set_ext_level,
-    .get_ext_level = dummy_get_ext_level,
-    .set_ext_func =  dummy_set_ext_func,
-    .get_ext_func =  dummy_get_ext_func,
-    .set_ext_parm =  dummy_set_ext_parm,
-    .get_ext_parm =  dummy_get_ext_parm,
+    .set_powerstat =  primesat_set_powerstat,
+    .get_powerstat =  primesat_get_powerstat,
+    .set_level =     primesat_set_level,
+    .get_level =     primesat_get_level,
+    .set_func =      primesat_set_func,
+    .get_func =      primesat_get_func,
+    .set_parm =      primesat_set_parm,
+    .get_parm =      primesat_get_parm,
+    .set_ext_level = primesat_set_ext_level,
+    .get_ext_level = primesat_get_ext_level,
+    .set_ext_func =  primesat_set_ext_func,
+    .get_ext_func =  primesat_get_ext_func,
+    .set_ext_parm =  primesat_set_ext_parm,
+    .get_ext_parm =  primesat_get_ext_parm,
 
-    .get_info =      dummy_get_info,
+    .get_info =      primesat_get_info,
 
 
-    //.set_ptt =    dummy_set_ptt,
-    //.get_ptt =    dummy_get_ptt,
-    //.get_dcd =    dummy_get_dcd,
-    //.set_rptr_shift =     dummy_set_rptr_shift,
-    //.get_rptr_shift =     dummy_get_rptr_shift,
-    //.set_rptr_offs =  dummy_set_rptr_offs,
-    //.get_rptr_offs =  dummy_get_rptr_offs,
-    //.set_ctcss_tone =     dummy_set_ctcss_tone,
-    //.get_ctcss_tone =     dummy_get_ctcss_tone,
-    //.set_dcs_code =   dummy_set_dcs_code,
-    //.get_dcs_code =   dummy_get_dcs_code,
-    //.set_ctcss_sql =  dummy_set_ctcss_sql,
-    //.get_ctcss_sql =  dummy_get_ctcss_sql,
-    //.set_dcs_sql =    dummy_set_dcs_sql,
-    //.get_dcs_sql =    dummy_get_dcs_sql,
-    .set_split_freq =     dummy_set_split_freq,
-    .get_split_freq =     dummy_get_split_freq,
-    .set_split_mode =     dummy_set_split_mode,
-    .get_split_mode =     dummy_get_split_mode,
-    .set_split_vfo =  dummy_set_split_vfo,
-    .get_split_vfo =  dummy_get_split_vfo,
-    //.set_rit =    dummy_set_rit,
-    //.get_rit =    dummy_get_rit,
-    //.set_xit =    dummy_set_xit,
-    //.get_xit =    dummy_get_xit,
-    .set_ts =     dummy_set_ts,
-    .get_ts =     dummy_get_ts,
-    //.set_ant =    dummy_set_ant,
-    //.get_ant =    dummy_get_ant,
-    //.set_bank =   dummy_set_bank,
-    //.set_mem =    dummy_set_mem,
-    //.get_mem =    dummy_get_mem,
-    .vfo_op =     dummy_vfo_op,
-    //.scan =       dummy_scan,
-    //.send_dtmf =  dummy_send_dtmf,
-    //.recv_dtmf =  dummy_recv_dtmf,
-    //.send_morse =  dummy_send_morse,
-    //.stop_morse =  dummy_stop_morse,
-    .send_voice_mem =  dummy_send_voice_mem,
-    .set_channel =    dummy_set_channel,
-    .get_channel =    dummy_get_channel,
-    .set_trn =    dummy_set_trn,
-    .get_trn =    dummy_get_trn,
-    .power2mW =   dummy_power2mW,
-    .mW2power =   dummy_mW2power,
-    //.set_clock = dummy_set_clock,
-    //.get_clock = dummy_get_clock,
+    .set_ptt =    primesat_set_ptt,
+    .get_ptt =    primesat_get_ptt,
+    .get_dcd =    primesat_get_dcd,
+    .set_rptr_shift =     primesat_set_rptr_shift,
+    .get_rptr_shift =     primesat_get_rptr_shift,
+    .set_rptr_offs =  primesat_set_rptr_offs,
+    .get_rptr_offs =  primesat_get_rptr_offs,
+    .set_ctcss_tone =     primesat_set_ctcss_tone,
+    .get_ctcss_tone =     primesat_get_ctcss_tone,
+    .set_dcs_code =   primesat_set_dcs_code,
+    .get_dcs_code =   primesat_get_dcs_code,
+    .set_ctcss_sql =  primesat_set_ctcss_sql,
+    .get_ctcss_sql =  primesat_get_ctcss_sql,
+    .set_dcs_sql =    primesat_set_dcs_sql,
+    .get_dcs_sql =    primesat_get_dcs_sql,
+    .set_split_freq =     primesat_set_split_freq,
+    .get_split_freq =     primesat_get_split_freq,
+    .set_split_mode =     primesat_set_split_mode,
+    .get_split_mode =     primesat_get_split_mode,
+    .set_split_vfo =  primesat_set_split_vfo,
+    .get_split_vfo =  primesat_get_split_vfo,
+    .set_rit =    primesat_set_rit,
+    .get_rit =    primesat_get_rit,
+    .set_xit =    primesat_set_xit,
+    .get_xit =    primesat_get_xit,
+    .set_ts =     primesat_set_ts,
+    .get_ts =     primesat_get_ts,
+    .set_ant =    primesat_set_ant,
+    .get_ant =    primesat_get_ant,
+    .set_bank =   primesat_set_bank,
+    .set_mem =    primesat_set_mem,
+    .get_mem =    primesat_get_mem,
+    .vfo_op =     primesat_vfo_op,
+    .scan =       primesat_scan,
+    .send_dtmf =  primesat_send_dtmf,
+    .recv_dtmf =  primesat_recv_dtmf,
+    .send_morse =  primesat_send_morse,
+    .stop_morse =  primesat_stop_morse,
+    .send_voice_mem =  primesat_send_voice_mem,
+    .set_channel =    primesat_set_channel,
+    .get_channel =    primesat_get_channel,
+    .set_trn =    primesat_set_trn,
+    .get_trn =    primesat_get_trn,
+    .power2mW =   primesat_power2mW,
+    .mW2power =   primesat_mW2power,
+    .set_clock = primesat_set_clock,
+    .get_clock = primesat_get_clock,
     .hamlib_check_rig_caps = HAMLIB_CHECK_RIG_CAPS
 };
 
@@ -2502,13 +1819,6 @@ DECLARE_INITRIG_BACKEND(primesat)
 {
     rig_debug(RIG_DEBUG_VERBOSE, "%s: _init called\n", __func__);
 
-    rig_register(&dummy_caps);
-    rig_register(&netrigctl_caps);
-    rig_register(&flrig_caps);
-    rig_register(&trxmanager_caps);
-    rig_register(&dummy_no_vfo_caps);
-    rig_register(&aclog_caps);
-    rig_register(&sdrsharp_caps);
-//    rig_register(&tci1x_caps);
+    rig_register(&primecontroller_caps);
     return RIG_OK;
 }
