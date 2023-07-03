@@ -111,6 +111,7 @@ static struct option long_options[] =
 };
 
 extern char rig_resp_sep;
+extern powerstat_t rig_powerstat;
 
 #define MAXCONFLEN 1024
 
@@ -149,6 +150,7 @@ int main(int argc, char *argv[])
     int i;
     char rigstartup[1024];
     char vbuf[1024];
+    rig_powerstat = RIG_POWER_ON; // defaults to power on
 
     int err = setvbuf(stderr, vbuf, _IOFBF, sizeof(vbuf));
 
@@ -551,6 +553,9 @@ int main(int argc, char *argv[])
             }
 
             rig_close(my_rig);
+            dumpstate(my_rig, stdout);
+            rig_close(my_rig);
+            exit(0);
         }
 
         dumpcaps(my_rig, stdout);
@@ -573,6 +578,12 @@ int main(int argc, char *argv[])
         printf("Opened rig model %u, '%s'\n",
                my_rig->caps->rig_model,
                my_rig->caps->model_name);
+    }
+
+    if (my_rig->caps->get_powerstat)
+    {
+        rig_get_powerstat(my_rig, &rig_powerstat);
+        my_rig->state.powerstat = rig_powerstat;
     }
 
     if (my_rig->caps->rig_model == RIG_MODEL_NETRIGCTL)
@@ -649,6 +660,21 @@ int main(int argc, char *argv[])
         retcode = rigctl_parse(my_rig, stdin, stdout, argv, argc, NULL,
                                interactive, prompt, &vfo_opt, send_cmd_term,
                                &ext_resp, &rig_resp_sep, 0);
+
+        // If we get a timeout, the rig might be powered off
+        // Update our power status in case power gets turned off
+        if (retcode == -RIG_ETIMEOUT && my_rig->caps->get_powerstat)
+        {
+            powerstat_t powerstat;
+
+            rig_get_powerstat(my_rig, &powerstat);
+            rig_powerstat = powerstat;
+
+            if (powerstat == RIG_POWER_OFF || powerstat == RIG_POWER_STANDBY)
+            {
+                retcode = -RIG_EPOWER;
+            }
+        }
 
         // if we get a hard error we try to reopen the rig again
         // this should cover short dropouts that can occur

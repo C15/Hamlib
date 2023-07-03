@@ -100,7 +100,7 @@ const char *hamlib_version2 = "Hamlib " PACKAGE_VERSION " " HAMLIBDATETIME " "
                               ARCHBITS;
 HAMLIB_EXPORT_VAR(int) cookie_use;
 HAMLIB_EXPORT_VAR(int) lock_mode; // for use by rigctld
-HAMLIB_EXPORT_VAR(powerstat_t) rig_powerstat; // for use by rigctld
+HAMLIB_EXPORT_VAR(powerstat_t) rig_powerstat; // for use by both rigctld and rigctl
 //! @endcond
 
 struct rig_caps caps_test;
@@ -248,6 +248,7 @@ static int add_opened_rig(RIG *rig)
 {
     struct opened_rig_l *p;
 
+    ENTERFUNC2;
     p = (struct opened_rig_l *)calloc(1, sizeof(struct opened_rig_l));
 
     if (!p)
@@ -560,11 +561,13 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     pthread_mutex_init(&rs->mutex_set_transaction, NULL);
 #endif
 
+    rs->rig_model = caps->rig_model;
     rs->priv = NULL;
     rs->async_data_enabled = 1;
     rs->rigport.fd = -1;
     rs->pttport.fd = -1;
     rs->comm_state = 0;
+    rig->state.depth = 1;
 #if 0 // extra debug if needed
     rig_debug(RIG_DEBUG_VERBOSE, "%s(%d): %p rs->comm_state==0?=%d\n", __func__,
               __LINE__, &rs->comm_state,
@@ -623,12 +626,27 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     rs->rigport.post_write_delay = caps->post_write_delay;
 
     // since we do two timeouts now we can cut the timeout in half for serial
-    if (caps->port_type == RIG_PORT_SERIAL)
+    if (caps->port_type == RIG_PORT_SERIAL && caps->timeout_retry >= 0)
     {
         rs->rigport.timeout = caps->timeout / 2;
     }
 
     rs->rigport.retry = caps->retry;
+
+    if (caps->timeout_retry < 0)
+    {
+        // Rigs may disable read timeout retries
+        rs->rigport.timeout_retry = 0;
+    }
+    else if (caps->timeout_retry == 0)
+    {
+        // Default to 1 retry for read timeouts
+        rs->rigport.timeout_retry = 1;
+    }
+    else
+    {
+        rs->rigport.timeout_retry = caps->timeout_retry;
+    }
 
     rs->pttport.type.ptt = caps->ptt_type;
     rs->dcdport.type.dcd = caps->dcd_type;
@@ -640,6 +658,7 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     rs->lo_freq = 0;
     rs->cache.timeout_ms = 500;  // 500ms cache timeout by default
     rs->cache.ptt = 0;
+    rs->targetable_vfo = rig->caps->targetable_vfo;
 
     // We are using range_list1 as the default
     // Eventually we will have separate model number for different rig variations
@@ -667,6 +686,11 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
     {
         rig_debug(RIG_DEBUG_VERBOSE, "%s: rig does not have tx_range!!\n", __func__);
         //return(NULL); // this is not fatal
+    }
+
+    //if (rs->level_gran)
+    {
+        memcpy(rs->level_gran, rig->caps->level_gran, sizeof(rs->level_gran));
     }
 
 #if 0 // this is no longer applicable -- replace it with something?
@@ -782,6 +806,9 @@ RIG *HAMLIB_API rig_init(rig_model_t rig_model)
 
     rs->rigport.fd = rs->pttport.fd = rs->dcdport.fd = -1;
     rs->powerstat = RIG_POWER_ON; // default to power on
+
+    // we have to copy rs to rig->state_deprecated for DLL backwards compatibility
+    memcpy(&rig->state_deprecated, rs, sizeof(rig->state_deprecated));
 
     /*
      * let the backend a chance to setup his private data
@@ -1274,6 +1301,7 @@ int HAMLIB_API rig_open(RIG *rig)
     rig_debug(RIG_DEBUG_VERBOSE, "%s: %p rs->comm_state==1?=%d\n", __func__,
               &rs->comm_state,
               rs->comm_state);
+    hl_usleep(100 * 1000); // wait a bit after opening to give some serial ports time
 
     /*
      * Maybe the backend has something to initialize
@@ -1289,14 +1317,13 @@ int HAMLIB_API rig_open(RIG *rig)
             powerstat_t powerflag;
             status = rig_get_powerstat(rig, &powerflag);
 
-            if (status == RIG_OK && powerflag == RIG_POWER_OFF
+            if (status == RIG_OK && (powerflag == RIG_POWER_OFF || powerflag == RIG_POWER_STANDBY)
                     && rig->state.auto_power_on == 0)
             {
+                // rig_open() should succeed even if the rig is powered off, so simply log power status
                 rig_debug(RIG_DEBUG_ERR,
-                          "%s: rig power is off, use --set-conf=auto_power_on=1 if power on is wanted\n",
+                          "%s: rig power is off, use --set-conf=auto_power_on=1 or set_powerstat if power on is wanted\n",
                           __func__);
-
-                RETURNFUNC2(-RIG_EPOWER);
             }
 
             // don't need auto_power_on if power is already on
@@ -1304,14 +1331,10 @@ int HAMLIB_API rig_open(RIG *rig)
 
             if (status == -RIG_ETIMEOUT)
             {
-                rig_debug(RIG_DEBUG_ERR, "%s: Some rigs cannot get_powerstat while off\n",
-                          __func__);
+                // rig_open() should succeed even if get_powerstat() fails,
+                // as many rigs cannot get power status while powered off
+                rig_debug(RIG_DEBUG_ERR, "%s: Some rigs cannot get_powerstat while off\n", __func__);
                 rig_debug(RIG_DEBUG_ERR, "%s: Known rigs: K3, K3S\n", __func__);
-                rig_debug(RIG_DEBUG_ERR, "%s: Rigs that should but don't work: TS480\n",
-                          __func__);
-                // A TS-480 user was showing ;;;;PS; not working so we'll just show the error message for now
-                // https://github.com/Hamlib/Hamlib/issues/1226
-                //RETURNFUNC2 (-RIG_EPOWER);
             }
         }
 
@@ -1331,7 +1354,6 @@ int HAMLIB_API rig_open(RIG *rig)
     /*
      * trigger state->current_vfo first retrieval
      */
-    HAMLIB_TRACE;
 
     if (caps->get_vfo && rig_get_vfo(rig, &rs->current_vfo) == RIG_OK)
     {
@@ -1364,7 +1386,7 @@ int HAMLIB_API rig_open(RIG *rig)
         {
             // for non-Icom rigs if there's no set_vfo then we need to set one
             rs->current_vfo = vfo_fixup(rig, RIG_VFO_A, rig->state.cache.split);
-            rig_debug(RIG_DEBUG_TRACE, "%s: No set_vfo function rig so default vfo = %s\n",
+            rig_debug(RIG_DEBUG_TRACE, "%s: No set_vfo function rig so default vfo=%s\n",
                       __func__, rig_strvfo(rs->current_vfo));
         }
         else
@@ -1774,9 +1796,10 @@ static int twiddling(RIG *rig)
  */
 #if BUILTINFUNC
 #undef rig_set_freq
-int HAMLIB_API rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq, const char *func)
+int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq, const char *func)
+#define rig_set_freq(r,v,f) rig_set_freq(r,v,f,__builtin_FUNCTION())
 #else
-int HAMLIB_API rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
+int rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 #endif
 {
     const struct rig_caps *caps;
@@ -1882,6 +1905,9 @@ int HAMLIB_API rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         {
             HAMLIB_TRACE;
             retcode = caps->set_freq(rig, vfo, freq);
+            // disabling the freq check as of 2023-06-02
+            // seems unnecessary and slows down rigs unnecessarily
+            tfreq = freq;
 
             // some rig will return -RIG_ENTARGET if cannot set ptt while transmitting
             // we will just return RIG_OK and the frequency set will be ignored
@@ -1977,15 +2003,22 @@ int HAMLIB_API rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         // verify our freq to ensure HZ mods are seen
         // some rigs truncate or round e.g. 1,2,5,10,20,100Hz intervals
         // we'll try this all the time and if it works out OK eliminate the #else
-
-        if ((unsigned long long)freq % 100 != 0 // only need to do if < 100Hz interval
-                || freq > 100e6  // or if we are in the VHF and up range
+        if (((unsigned long long)freq % 100 != 0 // only need to do if < 100Hz interval
+                || freq > 100e6)  // or if we are in the VHF and up range
 #if 0
                 // do we need to only do this when cache is turned on? 2020-07-02 W9MDB
                 && rig->state.cache.timeout_ms > 0
 #endif
            )
         {
+            // some rigs we can skip this check for speed sake
+            if (rig->state.rig_model == RIG_MODEL_MALACHITE)
+            {
+                rig_set_cache_freq(rig, vfo, freq);
+                ELAPSED2;
+                LOCK(0);
+                RETURNFUNC(RIG_OK);
+            }
             // Unidirectional rigs do not reset cache
             if (rig->caps->rig_model != RIG_MODEL_FT736R)
             {
@@ -1993,6 +2026,7 @@ int HAMLIB_API rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
             }
 
             HAMLIB_TRACE;
+
             retcode = rig_get_freq(rig, vfo, &freq_new);
 
             if (retcode != RIG_OK)
@@ -2045,7 +2079,13 @@ int HAMLIB_API rig_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
  *
  * \sa rig_set_freq()
  */
+#if BUILTINFUNC
+#undef rig_get_freq
+int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq, const char *func)
+#define rig_get_freq(r,v,f) rig_get_freq(r,v,f,__builtin_FUNCTION())
+#else
 int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
+#endif
 {
     const struct rig_caps *caps;
     int retcode;
@@ -2054,6 +2094,14 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
     pbwidth_t width;
 
     ENTERFUNC;
+#if BUILTINFUNC
+    rig_debug(RIG_DEBUG_VERBOSE, "%s called vfo=%s, called from %s\n",
+              __func__,
+              rig_strvfo(vfo), func);
+#else
+    rig_debug(RIG_DEBUG_VERBOSE, "%s called vfo=%s\n", __func__,
+              rig_strvfo(vfo));
+#endif
 
     if (CHECK_RIG_ARG(rig))
     {
@@ -2151,7 +2199,10 @@ int HAMLIB_API rig_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
 
     rig_cache_show(rig, __func__, __LINE__);
 
-    if (*freq != 0 && (cache_ms_freq < rig->state.cache.timeout_ms
+    // WSJT-X senses rig precision with 55 and 56 Hz values
+    // We do not want to allow cache response with these values 
+    int wsjtx_special = ((long)*freq % 100)==55 || ((long)*freq % 100)==56;
+    if (!wsjtx_special && *freq != 0 && (cache_ms_freq < rig->state.cache.timeout_ms
                        || (rig->state.cache.timeout_ms == HAMLIB_CACHE_ALWAYS
                            || rig->state.use_cached_freq)))
     {
@@ -2828,6 +2879,7 @@ pbwidth_t HAMLIB_API rig_passband_wide(RIG *rig, rmode_t mode)
 #if BUILTINFUNC
 #undef rig_set_vfo
 int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo, const char *func)
+#define rig_set_vfo(r,v) rig_set_vfo(r,v,__builtin_FUNCTION())
 #else
 int HAMLIB_API rig_set_vfo(RIG *rig, vfo_t vfo)
 #endif
@@ -3019,7 +3071,7 @@ int HAMLIB_API rig_get_vfo(RIG *rig, vfo_t *vfo)
 
     if (caps->get_vfo == NULL)
     {
-        rig_debug(RIG_DEBUG_ERR, "%s: no get_vfo\n", __func__);
+        rig_debug(RIG_DEBUG_WARN, "%s: no get_vfo\n", __func__);
         ELAPSED2;
         RETURNFUNC(-RIG_ENAVAIL);
     }
@@ -3355,7 +3407,12 @@ int HAMLIB_API rig_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
         retcode = gpio_ptt_set(&rig->state.pttport, ptt);
         break;
 
+    case RIG_PTT_NONE:
+        // allowed for use with VOX and WSJT-X
+        break;
+
     default:
+        rig_debug(RIG_DEBUG_WARN, "%s: unknown PTT type=%d\n", __func__, rig->state.pttport.type.ptt);
         ELAPSED2;
         RETURNFUNC(-RIG_EINVAL);
     }
@@ -4955,6 +5012,8 @@ int HAMLIB_API rig_set_split_freq_mode(RIG *rig,
 
     if (RIG_OK == retcode)
     {
+        rig_set_cache_freq(rig, vfo, tx_freq);
+
         HAMLIB_TRACE;
         retcode = rig_set_split_mode(rig, vfo, tx_mode, tx_width);
     }
@@ -5122,12 +5181,7 @@ int HAMLIB_API rig_set_split_vfo(RIG *rig,
 
     if ((!(caps->targetable_vfo & RIG_TARGETABLE_FREQ))
             && (!(rig->caps->rig_model == RIG_MODEL_NETRIGCTL)))
-#if BUILTINFUNC
-        rig_set_vfo(rig, rx_vfo, __builtin_FUNCTION());
-
-#else
         rig_set_vfo(rig, rx_vfo);
-#endif
 
     if (rx_vfo == RIG_VFO_CURR
             || rx_vfo == rig->state.current_vfo)
@@ -6061,6 +6115,7 @@ int HAMLIB_API rig_mW2power(RIG *rig,
                             rmode_t mode)
 {
     const freq_range_t *txrange;
+    int limited = 0;
 
     if (!rig || !rig->caps || !power || mwpower == 0)
     {
@@ -6088,14 +6143,20 @@ int HAMLIB_API rig_mW2power(RIG *rig,
         RETURNFUNC2(RIG_OK);
     }
 
-    *power = (float)mwpower / txrange->high_power;
+    *power = (float)mwpower / (float) txrange->high_power;
 
     if (*power > 1.0)
     {
         *power = 1.0;
+        limited = 1;
+    }
+    else if (*power < 0.0)
+    {
+        *power = 0;
+        limited = 1;
     }
 
-    RETURNFUNC2(mwpower > txrange->high_power ? RIG_OK : -RIG_ETRUNC);
+    RETURNFUNC2(limited ? RIG_ETRUNC : RIG_OK);
 }
 
 
@@ -6171,8 +6232,14 @@ int HAMLIB_API rig_set_powerstat(RIG *rig, powerstat_t status)
 
     HAMLIB_TRACE;
     retcode = rig->caps->set_powerstat(rig, status);
-    rig_flush(&rig->state.rigport); // if anything is queued up flush it
-    rig->state.auto_power_on = 1; // ensure we auto power on in the future
+
+    if (retcode == RIG_OK)
+    {
+        rig->state.powerstat = status;
+    }
+
+    // if anything is queued up flush it
+    rig_flush_force(&rig->state.rigport, 1);
     RETURNFUNC(retcode);
 }
 
@@ -6218,16 +6285,15 @@ int HAMLIB_API rig_get_powerstat(RIG *rig, powerstat_t *status)
     HAMLIB_TRACE;
     retcode = rig->caps->get_powerstat(rig, status);
 
-    if (retcode == RIG_EIO)
+    if (retcode == RIG_OK)
     {
-        rig_debug(RIG_DEBUG_ERR, "%s: hard error, reopening rig\n", __func__);
-        rig_close(rig);
-        rig_open(rig);
+        rig->state.powerstat = *status;
     }
-
-    if (retcode != RIG_OK) { *status = RIG_POWER_ON; } // if failed assume power is on
-
-    if (*status == RIG_POWER_OFF && rig->state.auto_power_on) { rig->caps->set_powerstat(rig, RIG_POWER_ON); }
+    else
+    {
+        // if failed, assume power is on
+        *status = RIG_POWER_ON;
+    }
 
     RETURNFUNC(retcode);
 }
@@ -6743,7 +6809,9 @@ int HAMLIB_API rig_send_morse(RIG *rig, vfo_t vfo, const char *msg)
     if (vfo == RIG_VFO_CURR
             || vfo == rig->state.current_vfo)
     {
+        LOCK(1);
         retcode = caps->send_morse(rig, vfo, msg);
+        LOCK(0);
         RETURNFUNC(retcode);
     }
 

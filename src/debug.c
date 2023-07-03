@@ -36,6 +36,7 @@
 #include <stdio.h>  /* Standard input/output definitions */
 #include <string.h> /* String function definitions */
 #include <sys/types.h>
+#include <errno.h>
 
 #ifdef ANDROID
 #  include <android/log.h>
@@ -146,6 +147,19 @@ void dump_hex(const unsigned char ptr[], size_t size)
 void HAMLIB_API rig_set_debug(enum rig_debug_level_e debug_level)
 {
     rig_debug_level = debug_level;
+}
+
+/**
+ * \brief Get the current debug level.
+ *
+ * \param debug_level Equivalent to the `-v` option of the utilities.
+ *
+ * Allows for obtaining the current debug level
+ *
+ */
+void HAMLIB_API rig_get_debug(enum rig_debug_level_e *debug_level)
+{
+    *debug_level = rig_debug_level;
 }
 
 
@@ -320,6 +334,32 @@ vprintf_cb_t HAMLIB_API rig_set_debug_callback(vprintf_cb_t cb, rig_ptr_t arg)
 FILE *HAMLIB_API rig_set_debug_file(FILE *stream)
 {
     FILE *prev_stream = rig_debug_stream;
+
+    rig_debug_stream = stream;
+
+    return prev_stream;
+}
+
+/**
+ * \brief Change the output stream to a filename
+ *
+ * \param filename The filename to direct debugging output.
+ *
+ * \sa `FILE`(3)
+ */
+FILE *HAMLIB_API rig_set_debug_filename(char *filename)
+{
+    FILE *prev_stream = rig_debug_stream;
+    rig_debug(RIG_DEBUG_WARN, "%s: debug will stream to '%s'\n", __func__,
+              filename);
+    FILE *stream = fopen(filename, "w");
+
+    if (stream == NULL)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: error opening stream: %s\n", __func__,
+                  strerror(errno));
+        return NULL;
+    }
 
     rig_debug_stream = stream;
 

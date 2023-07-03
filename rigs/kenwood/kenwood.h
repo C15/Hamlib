@@ -28,7 +28,7 @@
 #include "token.h"
 #include "idx_builtin.h"
 
-#define BACKEND_VER "20230517"
+#define BACKEND_VER "20230626"
 
 #define EOM_KEN ';'
 #define EOM_TH '\r'
@@ -175,7 +175,6 @@ struct kenwood_priv_data
     rmode_t modeB;
     int datamodeA; // datamode status from get_mode or set_mode
     int datamodeB; // datamode status from get_mode or set_mode
-    int ps_cmd_wakeup_data; // PS command requires wakeup characters (;)
     int question_mark_response_means_rejected; /* the question mark response has multiple meanings */
     int save_k2_ext_lvl; // so we can restore to original
     int save_k3_ext_lvl; // so we can restore to original -- for future use if needed
@@ -319,6 +318,7 @@ extern const struct rig_caps malachite_caps;
 extern const struct rig_caps tx500_caps;
 extern const struct rig_caps sdruno_caps;
 extern const struct rig_caps qrplabs_caps;
+extern const struct rig_caps fx4_caps;
 
 /* use when not interested in the answer, but want to check its len */
 static int inline kenwood_simple_transaction(RIG *rig, const char *cmd,

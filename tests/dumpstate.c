@@ -1,5 +1,5 @@
 /*
- * dumpcaps.c - Copyright (C) 2000-2012 Stephane Fillod
+ * dumpstate.c - Copyright (C) 2000-2012 Stephane Fillod
  * This programs dumps the capabilities of a backend rig.
  *
  *
@@ -40,7 +40,7 @@ struct rig_type_s
     char *description;
 };
 
-struct rig_type_s rig_type[] =
+static struct rig_type_s rig_type[] =
 {
     {RIG_TYPE_OTHER, "Other"},
     {RIG_FLAG_RECEIVER, "Receiver"},
@@ -67,7 +67,7 @@ static int print_ext(RIG *rig, const struct confparams *cfp, rig_ptr_t ptr)
 /*
  * the rig may be in rig_init state, but not opened
  */
-int dumpcaps(RIG *rig, FILE *fout)
+int dumpstate(RIG *rig, FILE *fout)
 {
     const struct rig_caps *caps;
     int status, i;
@@ -89,19 +89,19 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     caps = rig->caps;
 
-    fprintf(fout, "Caps dump for model: %u\n", caps->rig_model);
-    fprintf(fout, "Model name:\t%s\n", caps->model_name);
-    fprintf(fout, "Mfg name:\t%s\n", caps->mfg_name);
-    fprintf(fout, "Backend version:\t%s\n", caps->version);
-    fprintf(fout, "Backend copyright:\t%s\n", caps->copyright);
-    fprintf(fout, "Backend status:\t%s\n", rig_strstatus(caps->status));
+    fprintf(fout, "Caps dump for model: %u\n", rig->state.rig_model);
+    fprintf(fout, "Model name:\t%s\n", rig->state.model_name);
+    fprintf(fout, "Mfg name:\t%s\n", rig->state.mfg_name);
+    fprintf(fout, "Backend version:\t%s\n", rig->state.version);
+    fprintf(fout, "Backend copyright:\t%s\n", rig->state.copyright);
+    fprintf(fout, "Backend status:\t%s\n", rig_strstatus(rig->state.status));
     fprintf(fout, "Rig type:\t");
 
     char *unknown = "Unknown";
 
     for (i = 0; rig_type[i].type != -1; ++i)
     {
-        if ((rig_type[i].type & caps->rig_type) == rig_type[i].type)
+        if ((rig_type[i].type & rig->state.rig_type) == rig_type[i].type)
         {
             fprintf(fout, "%s ", rig_type[i].description);
             unknown = "";
@@ -118,7 +118,7 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "PTT type:\t");
 
-    switch (caps->ptt_type)
+    switch (rig->state.ptt_type)
     {
     case RIG_PTT_RIG:
         fprintf(fout, "Rig capable\n");
@@ -152,7 +152,7 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "DCD type:\t");
 
-    switch (caps->dcd_type)
+    switch (rig->state.dcd_type)
     {
     case RIG_DCD_RIG:
         fprintf(fout, "Rig capable\n");
@@ -186,22 +186,22 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "Port type:\t");
 
-    switch (caps->port_type)
+    switch (rig->state.port_type)
     {
     case RIG_PORT_SERIAL:
         fprintf(fout, "RS-232\n");
         fprintf(fout,
                 "Serial speed: %d..%d baud, %d%c%d, ctrl=%s\n",
-                caps->serial_rate_min,
-                caps->serial_rate_max,
-                caps->serial_data_bits,
-                caps->serial_parity == RIG_PARITY_NONE ? 'N' :
-                caps->serial_parity == RIG_PARITY_ODD ? 'O' :
-                caps->serial_parity == RIG_PARITY_EVEN ? 'E' :
-                caps->serial_parity == RIG_PARITY_MARK ? 'M' : 'S',
-                caps->serial_stop_bits,
-                caps->serial_handshake == RIG_HANDSHAKE_NONE ? "NONE" :
-                (caps->serial_handshake == RIG_HANDSHAKE_XONXOFF ? "XONXOFF" : "CTS/RTS")
+                rig->state.serial_rate_min,
+                rig->state.serial_rate_max,
+                rig->state.serial_data_bits,
+                rig->state.serial_parity == RIG_PARITY_NONE ? 'N' :
+                rig->state.serial_parity == RIG_PARITY_ODD ? 'O' :
+                rig->state.serial_parity == RIG_PARITY_EVEN ? 'E' :
+                rig->state.serial_parity == RIG_PARITY_MARK ? 'M' : 'S',
+                rig->state.serial_stop_bits,
+                rig->state.serial_handshake == RIG_HANDSHAKE_NONE ? "NONE" :
+                (rig->state.serial_handshake == RIG_HANDSHAKE_XONXOFF ? "XONXOFF" : "CTS/RTS")
                );
         break;
 
@@ -237,40 +237,40 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout,
             "Write delay: %dms, timeout %dms, %d retry\n",
-            caps->write_delay, caps->timeout, caps->retry);
+            rig->state.write_delay, rig->state.timeout, rig->state.retry);
     fprintf(fout,
             "Post write delay: %dms\n",
-            caps->post_write_delay);
+            rig->state.post_write_delay);
 
     fprintf(fout,
             "Has targetable VFO: %s\n",
-            caps->targetable_vfo ? "Y" : "N");
+            rig->state.targetable_vfo ? "Y" : "N");
 
     fprintf(fout,
             "Has async data support: %s\n",
-            caps->async_data_supported ? "Y" : "N");
+            rig->state.async_data_supported ? "Y" : "N");
 
-    fprintf(fout, "Announce: 0x%x\n", caps->announces);
+    fprintf(fout, "Announce: 0x%x\n", rig->state.announces);
     fprintf(fout,
             "Max RIT: -%ld.%ldkHz/+%ld.%ldkHz\n",
-            caps->max_rit / 1000, caps->max_rit % 1000,
-            caps->max_rit / 1000, caps->max_rit % 1000);
+            rig->state.max_rit / 1000, rig->state.max_rit % 1000,
+            rig->state.max_rit / 1000, rig->state.max_rit % 1000);
 
     fprintf(fout,
             "Max XIT: -%ld.%ldkHz/+%ld.%ldkHz\n",
-            caps->max_xit / 1000, caps->max_xit % 1000,
-            caps->max_xit / 1000, caps->max_xit % 1000);
+            rig->state.max_xit / 1000, rig->state.max_xit % 1000,
+            rig->state.max_xit / 1000, rig->state.max_xit % 1000);
 
     fprintf(fout,
             "Max IF-SHIFT: -%ld.%ldkHz/+%ld.%ldkHz\n",
-            caps->max_ifshift / 1000, caps->max_ifshift % 1000,
-            caps->max_ifshift / 1000, caps->max_ifshift % 1000);
+            rig->state.max_ifshift / 1000, rig->state.max_ifshift % 1000,
+            rig->state.max_ifshift / 1000, rig->state.max_ifshift % 1000);
 
     fprintf(fout, "Preamp:");
 
-    for (i = 0; i < HAMLIB_MAXDBLSTSIZ && caps->preamp[i] != 0; i++)
+    for (i = 0; i < HAMLIB_MAXDBLSTSIZ && rig->state.preamp[i] != 0; i++)
     {
-        fprintf(fout, " %ddB", caps->preamp[i]);
+        fprintf(fout, " %ddB", rig->state.preamp[i]);
     }
 
     if (i == 0)
@@ -281,9 +281,9 @@ int dumpcaps(RIG *rig, FILE *fout)
     fprintf(fout, "\n");
     fprintf(fout, "Attenuator:");
 
-    for (i = 0; i < HAMLIB_MAXDBLSTSIZ && caps->attenuator[i] != 0; i++)
+    for (i = 0; i < HAMLIB_MAXDBLSTSIZ && rig->state.attenuator[i] != 0; i++)
     {
-        fprintf(fout, " %ddB", caps->attenuator[i]);
+        fprintf(fout, " %ddB", rig->state.attenuator[i]);
     }
 
     if (i == 0)
@@ -296,9 +296,9 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "AGC levels:");
     const struct icom_priv_caps *priv_caps =
-        (const struct icom_priv_caps *) rig->caps->priv;
+        (const struct icom_priv_caps *) rig->state.priv;
 
-    if (priv_caps && RIG_BACKEND_NUM(rig->caps->rig_model) == RIG_ICOM
+    if (priv_caps && RIG_BACKEND_NUM(rig->state.rig_model) == RIG_ICOM
             && priv_caps->agc_levels_present)
     {
         for (i = 0; i < HAMLIB_MAX_AGC_LEVELS && priv_caps->agc_levels[i].level != RIG_AGC_LAST
@@ -310,10 +310,10 @@ int dumpcaps(RIG *rig, FILE *fout)
     }
     else
     {
-        for (i = 0; i < HAMLIB_MAX_AGC_LEVELS && i < caps->agc_level_count; i++)
+        for (i = 0; i < HAMLIB_MAX_AGC_LEVELS && i < rig->state.agc_level_count; i++)
         {
-            fprintf(fout, " %d=%s", caps->agc_levels[i],
-                    rig_stragclevel(caps->agc_levels[i]));
+            fprintf(fout, " %d=%s", rig->state.agc_levels[i],
+                    rig_stragclevel(rig->state.agc_levels[i]));
         }
     }
 
@@ -326,11 +326,11 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "CTCSS:");
 
-    for (i = 0; caps->ctcss_list && i < 60 && caps->ctcss_list[i] != 0; i++)
+    for (i = 0; rig->state.ctcss_list && i < 60 && rig->state.ctcss_list[i] != 0; i++)
     {
         fprintf(fout,
                 " %u.%1u",
-                caps->ctcss_list[i] / 10, caps->ctcss_list[i] % 10);
+                rig->state.ctcss_list[i] / 10, rig->state.ctcss_list[i] % 10);
     }
 
     if (i == 0)
@@ -346,9 +346,9 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "DCS:");
 
-    for (i = 0; caps->dcs_list && i < 128 && caps->dcs_list[i] != 0; i++)
+    for (i = 0; rig->state.dcs_list && i < 128 && rig->state.dcs_list[i] != 0; i++)
     {
-        fprintf(fout, " %u", caps->dcs_list[i]);
+        fprintf(fout, " %u", rig->state.dcs_list[i]);
     }
 
     if (i == 0)
@@ -362,22 +362,22 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "\n");
 
-    rig_sprintf_func(prntbuf, sizeof(prntbuf), caps->has_get_func);
+    rig_sprintf_func(prntbuf, sizeof(prntbuf), rig->state.has_get_func);
     fprintf(fout, "Get functions: %s\n", prntbuf);
 
-    rig_sprintf_func(prntbuf, sizeof(prntbuf), caps->has_set_func);
+    rig_sprintf_func(prntbuf, sizeof(prntbuf), rig->state.has_set_func);
     fprintf(fout, "Set functions: %s\n", prntbuf);
 
     fprintf(fout, "Extra functions:\n");
     rig_ext_func_foreach(rig, print_ext, fout);
 
-    rig_sprintf_level_gran(prntbuf, sizeof(prntbuf), caps->has_get_level,
-                           caps->level_gran);
+    rig_sprintf_level_gran(prntbuf, sizeof(prntbuf), rig->state.has_get_level,
+                           rig->state.level_gran);
     fprintf(fout, "Get level: %s\n", prntbuf);
 
-    if ((caps->has_get_level & RIG_LEVEL_RAWSTR)
-            && caps->str_cal.size == 0
-            && !(caps->has_get_level & RIG_LEVEL_STRENGTH))
+    if ((rig->state.has_get_level & RIG_LEVEL_RAWSTR)
+            && rig->state.str_cal.size == 0
+            && !(rig->state.has_get_level & RIG_LEVEL_STRENGTH))
     {
 
         fprintf(fout,
@@ -386,14 +386,14 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    rig_sprintf_level_gran(prntbuf, sizeof(prntbuf), caps->has_set_level,
-                           caps->level_gran);
+    rig_sprintf_level_gran(prntbuf, sizeof(prntbuf), rig->state.has_set_level,
+                           rig->state.level_gran);
     fprintf(fout, "Set level: %s\n", prntbuf);
 
-    if (caps->has_set_level & RIG_LEVEL_READONLY_LIST)
+    if (rig->state.has_set_level & RIG_LEVEL_READONLY_LIST)
     {
 
-        //fprintf(fout, "Warning--backend can set readonly levels=0x%0llx\n", caps->has_set_level & RIG_LEVEL_READONLY_LIST);
+        //fprintf(fout, "Warning--backend can set readonly levels=0x%0llx\n", rig->state.has_set_level & RIG_LEVEL_READONLY_LIST);
         fprintf(fout, "Warning--backend can set readonly levels\n");
         strcat(warnbuf, " READONLY_LEVEL");
         backend_warnings++;
@@ -402,15 +402,15 @@ int dumpcaps(RIG *rig, FILE *fout)
     fprintf(fout, "Extra levels:\n");
     rig_ext_level_foreach(rig, print_ext, fout);
 
-    rig_sprintf_parm_gran(prntbuf, sizeof(prntbuf), caps->has_get_parm,
-                          caps->parm_gran);
+    rig_sprintf_parm_gran(prntbuf, sizeof(prntbuf), rig->state.has_get_parm,
+                          rig->state.parm_gran);
     fprintf(fout, "Get parameters: %s\n", prntbuf);
 
-    rig_sprintf_parm_gran(prntbuf, sizeof(prntbuf), caps->has_set_parm,
-                          caps->parm_gran);
+    rig_sprintf_parm_gran(prntbuf, sizeof(prntbuf), rig->state.has_set_parm,
+                          rig->state.parm_gran);
     fprintf(fout, "Set parameters: %s\n", prntbuf);
 
-    if (caps->has_set_parm & RIG_PARM_READONLY_LIST)
+    if (rig->state.has_set_parm & RIG_PARM_READONLY_LIST)
     {
         fprintf(fout, "Warning--backend can set readonly parms!\n");
         strcat(warnbuf, " READONLY_PARM");
@@ -447,26 +447,26 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "VFO list: %s\n", prntbuf);
 
-    rig_sprintf_vfop(prntbuf, sizeof(prntbuf), caps->vfo_ops);
+    rig_sprintf_vfop(prntbuf, sizeof(prntbuf), rig->state.vfo_ops);
     fprintf(fout, "VFO Ops: %s\n", prntbuf);
 
-    rig_sprintf_scan(prntbuf, sizeof(prntbuf), caps->scan_ops);
+    rig_sprintf_scan(prntbuf, sizeof(prntbuf), rig->state.scan_ops);
     fprintf(fout, "Scan Ops: %s\n", prntbuf);
 
-    fprintf(fout, "Number of banks:\t%d\n", caps->bank_qty);
-    fprintf(fout, "Memory name desc size:\t%d\n", caps->chan_desc_sz);
+    fprintf(fout, "Number of banks:\t%d\n", rig->state.bank_qty);
+    fprintf(fout, "Memory name desc size:\t%d\n", rig->state.chan_desc_sz);
 
     fprintf(fout, "Memories:");
 
-    for (i = 0; i < HAMLIB_CHANLSTSIZ && caps->chan_list[i].type; i++)
+    for (i = 0; i < HAMLIB_CHANLSTSIZ && rig->state.chan_list[i].type; i++)
     {
         fprintf(fout,
                 "\n\t%d..%d:   \t%s",
-                caps->chan_list[i].startc,
-                caps->chan_list[i].endc,
-                rig_strmtype(caps->chan_list[i].type));
+                rig->state.chan_list[i].startc,
+                rig->state.chan_list[i].endc,
+                rig_strmtype(rig->state.chan_list[i].type));
         fprintf(fout, "\n\t  Mem caps: ");
-        dump_chan_caps(&caps->chan_list[i].mem_caps, fout);
+        dump_chan_caps(&rig->state.chan_list[i].mem_caps, fout);
     }
 
     if (i == 0)
@@ -476,57 +476,57 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "\n");
 
-    label1 = caps->tx_range_list1->label;
+    label1 = rig->state.tx_range_list1->label;
     label1 = label1 == NULL ? "TBD" : label1;
     fprintf(fout, "TX ranges #1 for %s:\n", label1);
-    range_print(fout, caps->tx_range_list1, 0);
+    range_print(fout, rig->state.tx_range_list1, 0);
 
-    labelrx1 = caps->rx_range_list1->label;
+    labelrx1 = rig->state.rx_range_list1->label;
     labelrx1 = labelrx1 == NULL ? "TBD" : labelrx1;
     fprintf(fout, "RX ranges #1 for %s:\n", labelrx1);
-    range_print(fout, caps->rx_range_list1, 1);
+    range_print(fout, rig->state.rx_range_list1, 1);
 
-    label2 = caps->rx_range_list2->label;
+    label2 = rig->state.rx_range_list2->label;
     label2 = label2 == NULL ? "TBD" : label2;
     fprintf(fout, "TX ranges #2 for %s:\n", label2);
-    range_print(fout, caps->tx_range_list2, 0);
+    range_print(fout, rig->state.tx_range_list2, 0);
 
-    label2 = caps->rx_range_list2->label;
+    label2 = rig->state.rx_range_list2->label;
     label2 = label2 == NULL ? "TBD" : label2;
     fprintf(fout, "RX ranges #2 for %s:\n", label2);
-    range_print(fout, caps->rx_range_list2, 1);
+    range_print(fout, rig->state.rx_range_list2, 1);
 
-    label3 = caps->rx_range_list3->label;
+    label3 = rig->state.rx_range_list3->label;
     label3 = label3 == NULL ? "TBD" : label3;
     fprintf(fout, "TX ranges #3 for %s:\n", label3);
-    range_print(fout, caps->tx_range_list3, 0);
+    range_print(fout, rig->state.tx_range_list3, 0);
 
-    label3 = caps->rx_range_list3->label;
+    label3 = rig->state.rx_range_list3->label;
     label3 = label3 == NULL ? "TBD" : label3;
     fprintf(fout, "RX ranges #3 for %s:\n", label3);
-    range_print(fout, caps->rx_range_list3, 1);
+    range_print(fout, rig->state.rx_range_list3, 1);
 
-    label4 = caps->rx_range_list4->label;
+    label4 = rig->state.rx_range_list4->label;
     label4 = label4 == NULL ? "TBD" : label4;
     fprintf(fout, "TX ranges #4 for %s:\n", label4);
-    range_print(fout, caps->tx_range_list5, 0);
+    range_print(fout, rig->state.tx_range_list5, 0);
 
-    label4 = caps->rx_range_list4->label;
+    label4 = rig->state.rx_range_list4->label;
     label4 = label4 == NULL ? "TBD" : label4;
     fprintf(fout, "RX ranges #4 for %s:\n", label4);
-    range_print(fout, caps->rx_range_list5, 1);
+    range_print(fout, rig->state.rx_range_list5, 1);
 
-    label5 = caps->rx_range_list5->label;
+    label5 = rig->state.rx_range_list5->label;
     label5 = label5 == NULL ? "TBD" : label5;
     fprintf(fout, "TX ranges #5 for %s:\n", label5);
-    range_print(fout, caps->tx_range_list5, 0);
+    range_print(fout, rig->state.tx_range_list5, 0);
 
-    label5 = caps->rx_range_list5->label;
+    label5 = rig->state.rx_range_list5->label;
     label5 = label5 == NULL ? "TBD" : label5;
     fprintf(fout, "RX ranges #5 for %s:\n", label5);
-    range_print(fout, caps->rx_range_list5, 1);
+    range_print(fout, rig->state.rx_range_list5, 1);
 
-    status = range_sanity_check(caps->tx_range_list1, 0);
+    status = range_sanity_check(rig->state.tx_range_list1, 0);
     fprintf(fout,
             "TX ranges #1 status for %s:\t%s (%d)\n", label1,
             status ? "Bad" : "OK",
@@ -538,7 +538,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->rx_range_list1, 1);
+    status = range_sanity_check(rig->state.rx_range_list1, 1);
     fprintf(fout,
             "RX ranges #1 status for %s:\t%s (%d)\n", labelrx1,
             status ? "Bad" : "OK",
@@ -550,7 +550,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->tx_range_list2, 0);
+    status = range_sanity_check(rig->state.tx_range_list2, 0);
     fprintf(fout,
             "TX ranges #2 status for %s:\t%s (%d)\n", label2,
             status ? "Bad" : "OK",
@@ -562,7 +562,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->rx_range_list2, 1);
+    status = range_sanity_check(rig->state.rx_range_list2, 1);
     fprintf(fout,
             "RX ranges #2 status for %s:\t%s (%d)\n", label2,
             status ? "Bad" : "OK",
@@ -574,7 +574,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->tx_range_list3, 0);
+    status = range_sanity_check(rig->state.tx_range_list3, 0);
     fprintf(fout,
             "TX ranges #3 status for %s:\t%s (%d)\n", label3,
             status ? "Bad" : "OK",
@@ -586,7 +586,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->rx_range_list3, 1);
+    status = range_sanity_check(rig->state.rx_range_list3, 1);
     fprintf(fout,
             "RX ranges #3 status for %s:\t%s (%d)\n", label3,
             status ? "Bad" : "OK",
@@ -598,7 +598,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->tx_range_list4, 0);
+    status = range_sanity_check(rig->state.tx_range_list4, 0);
     fprintf(fout,
             "TX ranges #4 status for %s:\t%s (%d)\n", label4,
             status ? "Bad" : "OK",
@@ -610,7 +610,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->rx_range_list4, 1);
+    status = range_sanity_check(rig->state.rx_range_list4, 1);
     fprintf(fout,
             "RX ranges #4 status for %s:\t%s (%d)\n", label4,
             status ? "Bad" : "OK",
@@ -622,7 +622,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->tx_range_list5, 0);
+    status = range_sanity_check(rig->state.tx_range_list5, 0);
     fprintf(fout,
             "TX ranges #5 status for %s:\t%s (%d)\n", label5,
             status ? "Bad" : "OK",
@@ -634,7 +634,7 @@ int dumpcaps(RIG *rig, FILE *fout)
         backend_warnings++;
     }
 
-    status = range_sanity_check(caps->rx_range_list5, 1);
+    status = range_sanity_check(rig->state.rx_range_list5, 1);
     fprintf(fout,
             "RX ranges #5 status for %s:\t%s (%d)\n", label5,
             status ? "Bad" : "OK",
@@ -648,18 +648,18 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "Tuning steps:");
 
-    for (i = 0; i < HAMLIB_TSLSTSIZ && !RIG_IS_TS_END(caps->tuning_steps[i]); i++)
+    for (i = 0; i < HAMLIB_TSLSTSIZ && !RIG_IS_TS_END(rig->state.tuning_steps[i]); i++)
     {
-        if (caps->tuning_steps[i].ts == RIG_TS_ANY)
+        if (rig->state.tuning_steps[i].ts == RIG_TS_ANY)
         {
             strcpy(freqbuf, "ANY");    /* strcpy!  Looks safe for now */
         }
         else
         {
-            sprintf_freq(freqbuf, sizeof(freqbuf), caps->tuning_steps[i].ts);
+            sprintf_freq(freqbuf, sizeof(freqbuf), rig->state.tuning_steps[i].ts);
         }
 
-        rig_sprintf_mode(prntbuf, sizeof(prntbuf), caps->tuning_steps[i].modes);
+        rig_sprintf_mode(prntbuf, sizeof(prntbuf), rig->state.tuning_steps[i].modes);
         fprintf(fout, "\n\t%s:   \t%s", freqbuf, prntbuf);
     }
 
@@ -671,7 +671,7 @@ int dumpcaps(RIG *rig, FILE *fout)
     }
 
     fprintf(fout, "\n");
-    status = ts_sanity_check(caps->tuning_steps);
+    status = ts_sanity_check(rig->state.tuning_steps);
     fprintf(fout, "Tuning steps status:\t%s (%d)\n", status ? "Bad" : "OK", status);
 
     if (status)
@@ -682,18 +682,18 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "Filters:");
 
-    for (i = 0; i < HAMLIB_FLTLSTSIZ && !RIG_IS_FLT_END(caps->filters[i]); i++)
+    for (i = 0; i < HAMLIB_FLTLSTSIZ && !RIG_IS_FLT_END(rig->state.filters[i]); i++)
     {
-        if (caps->filters[i].width == RIG_FLT_ANY)
+        if (rig->state.filters[i].width == RIG_FLT_ANY)
         {
             strcpy(freqbuf, "ANY");
         }
         else
         {
-            sprintf_freq(freqbuf, sizeof(freqbuf), caps->filters[i].width);
+            sprintf_freq(freqbuf, sizeof(freqbuf), rig->state.filters[i].width);
         }
 
-        rig_sprintf_mode(prntbuf, sizeof(prntbuf), caps->filters[i].modes);
+        rig_sprintf_mode(prntbuf, sizeof(prntbuf), rig->state.filters[i].modes);
         fprintf(fout, "\n\t%s:   \t%s", freqbuf, prntbuf);
     }
 
@@ -732,10 +732,10 @@ int dumpcaps(RIG *rig, FILE *fout)
     fprintf(fout, "Spectrum scopes:");
 
     for (i = 0; i < HAMLIB_MAX_SPECTRUM_SCOPES
-            && caps->spectrum_scopes[i].name != NULL; i++)
+            && rig->state.spectrum_scopes[i].name != NULL; i++)
     {
-        fprintf(fout, " %d=\"%s\"", caps->spectrum_scopes[i].id,
-                caps->spectrum_scopes[i].name);
+        fprintf(fout, " %d=\"%s\"", rig->state.spectrum_scopes[i].id,
+                rig->state.spectrum_scopes[i].name);
     }
 
     if (i == 0)
@@ -745,21 +745,21 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "\n");
 
-    rig_sprintf_spectrum_modes(prntbuf, sizeof(prntbuf), caps->spectrum_modes);
+    rig_sprintf_spectrum_modes(prntbuf, sizeof(prntbuf), rig->state.spectrum_modes);
     fprintf(fout, "Spectrum modes: %s\n", prntbuf);
 
-    rig_sprintf_spectrum_spans(prntbuf, sizeof(prntbuf), caps->spectrum_spans);
+    rig_sprintf_spectrum_spans(prntbuf, sizeof(prntbuf), rig->state.spectrum_spans);
     fprintf(fout, "Spectrum spans: %s\n", prntbuf);
 
     rig_sprintf_spectrum_avg_modes(prntbuf, sizeof(prntbuf),
-                                   caps->spectrum_avg_modes);
+                                   rig->state.spectrum_avg_modes);
     fprintf(fout, "Spectrum averaging modes: %s\n", prntbuf);
 
     fprintf(fout, "Spectrum attenuator:");
 
-    for (i = 0; i < HAMLIB_MAXDBLSTSIZ && caps->spectrum_attenuator[i] != 0; i++)
+    for (i = 0; i < HAMLIB_MAXDBLSTSIZ && rig->state.spectrum_attenuator[i] != 0; i++)
     {
-        fprintf(fout, " %ddB", caps->spectrum_attenuator[i]);
+        fprintf(fout, " %ddB", rig->state.spectrum_attenuator[i]);
     }
 
     if (i == 0)
@@ -769,155 +769,155 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     fprintf(fout, "\n");
 
-    fprintf(fout, "Has priv data:\t%c\n", caps->priv != NULL ? 'Y' : 'N');
+    fprintf(fout, "Has priv data:\t%c\n", rig->state.priv != NULL ? 'Y' : 'N');
     /*
      * Status is either 'Y'es, 'E'mulated, 'N'o
      *
      * TODO: keep me up-to-date with API call list!
      */
-    fprintf(fout, "Has Init:\t%c\n", caps->rig_init != NULL ? 'Y' : 'N');
-    fprintf(fout, "Has Cleanup:\t%c\n", caps->rig_cleanup != NULL ? 'Y' : 'N');
-    fprintf(fout, "Has Open:\t%c\n", caps->rig_open != NULL ? 'Y' : 'N');
-    fprintf(fout, "Has Close:\t%c\n", caps->rig_close != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Conf:\t%c\n", caps->set_conf != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Conf:\t%c\n", caps->get_conf != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Frequency:\t%c\n", caps->set_freq != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Frequency:\t%c\n", caps->get_freq != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Mode:\t%c\n", caps->set_mode != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Mode:\t%c\n", caps->get_mode != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set VFO:\t%c\n", caps->set_vfo != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get VFO:\t%c\n", caps->get_vfo != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set PTT:\t%c\n", caps->set_ptt != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get PTT:\t%c\n", caps->get_ptt != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get DCD:\t%c\n", caps->get_dcd != NULL ? 'Y' : 'N');
+    fprintf(fout, "Has Init:\t%c\n", rig->caps->rig_init != NULL ? 'Y' : 'N');
+    fprintf(fout, "Has Cleanup:\t%c\n", rig->caps->rig_cleanup != NULL ? 'Y' : 'N');
+    fprintf(fout, "Has Open:\t%c\n", rig->caps->rig_open != NULL ? 'Y' : 'N');
+    fprintf(fout, "Has Close:\t%c\n", rig->caps->rig_close != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Conf:\t%c\n", rig->caps->set_conf != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Conf:\t%c\n", rig->caps->get_conf != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Frequency:\t%c\n", rig->caps->set_freq != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Frequency:\t%c\n", rig->caps->get_freq != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Mode:\t%c\n", rig->caps->set_mode != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Mode:\t%c\n", rig->caps->get_mode != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set VFO:\t%c\n", rig->caps->set_vfo != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get VFO:\t%c\n", rig->caps->get_vfo != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set PTT:\t%c\n", rig->caps->set_ptt != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get PTT:\t%c\n", rig->caps->get_ptt != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get DCD:\t%c\n", rig->caps->get_dcd != NULL ? 'Y' : 'N');
     fprintf(fout,
             "Can set Repeater Duplex:\t%c\n",
-            caps->set_rptr_shift != NULL ? 'Y' : 'N');
+            rig->caps->set_rptr_shift != NULL ? 'Y' : 'N');
     fprintf(fout,
             "Can get Repeater Duplex:\t%c\n",
-            caps->get_rptr_shift != NULL ? 'Y' : 'N');
+            rig->caps->get_rptr_shift != NULL ? 'Y' : 'N');
     fprintf(fout,
             "Can set Repeater Offset:\t%c\n",
-            caps->set_rptr_offs != NULL ? 'Y' : 'N');
+            rig->caps->set_rptr_offs != NULL ? 'Y' : 'N');
     fprintf(fout,
             "Can get Repeater Offset:\t%c\n",
-            caps->get_rptr_offs != NULL ? 'Y' : 'N');
+            rig->caps->get_rptr_offs != NULL ? 'Y' : 'N');
 
-    can_esplit = caps->set_split_vfo
-                 && (caps->set_vfo
-                     || (rig_has_vfo_op(rig, RIG_OP_TOGGLE) && caps->vfo_op));
+    can_esplit = rig->caps->set_split_vfo
+                 && (rig->caps->set_vfo
+                     || (rig_has_vfo_op(rig, RIG_OP_TOGGLE) && rig->caps->vfo_op));
 
     fprintf(fout,
             "Can set Split Freq:\t%c\n",
-            caps->set_split_freq != NULL ? 'Y' : (can_esplit
-                    && caps->set_freq ? 'E' : 'N'));
+            rig->caps->set_split_freq != NULL ? 'Y' : (can_esplit
+                    && rig->caps->set_freq ? 'E' : 'N'));
 
     fprintf(fout,
             "Can get Split Freq:\t%c\n",
-            caps->get_split_freq != NULL ? 'Y' : (can_esplit
-                    && caps->get_freq ? 'E' : 'N'));
+            rig->caps->get_split_freq != NULL ? 'Y' : (can_esplit
+                    && rig->caps->get_freq ? 'E' : 'N'));
 
     fprintf(fout,
             "Can set Split Mode:\t%c\n",
-            caps->set_split_mode != NULL ? 'Y' : (can_esplit
-                    && caps->set_mode ? 'E' : 'N'));
+            rig->caps->set_split_mode != NULL ? 'Y' : (can_esplit
+                    && rig->caps->set_mode ? 'E' : 'N'));
 
     fprintf(fout,
             "Can get Split Mode:\t%c\n",
-            caps->get_split_mode != NULL ? 'Y' : (can_esplit
-                    && caps->get_mode ? 'E' : 'N'));
+            rig->caps->get_split_mode != NULL ? 'Y' : (can_esplit
+                    && rig->caps->get_mode ? 'E' : 'N'));
 
     fprintf(fout,
             "Can set Split VFO:\t%c\n",
-            caps->set_split_vfo != NULL ? 'Y' : 'N');
+            rig->caps->set_split_vfo != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can get Split VFO:\t%c\n",
-            caps->get_split_vfo != NULL ? 'Y' : 'N');
+            rig->caps->get_split_vfo != NULL ? 'Y' : 'N');
 
-    fprintf(fout, "Can set Tuning Step:\t%c\n", caps->set_ts != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Tuning Step:\t%c\n", caps->get_ts != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set RIT:\t%c\n", caps->set_rit != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get RIT:\t%c\n", caps->get_rit != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set XIT:\t%c\n", caps->set_xit != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get XIT:\t%c\n", caps->get_xit != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set CTCSS:\t%c\n", caps->set_ctcss_tone != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get CTCSS:\t%c\n", caps->get_ctcss_tone != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set DCS:\t%c\n", caps->set_dcs_code != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get DCS:\t%c\n", caps->get_dcs_code != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Tuning Step:\t%c\n", rig->caps->set_ts != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Tuning Step:\t%c\n", rig->caps->get_ts != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set RIT:\t%c\n", rig->caps->set_rit != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get RIT:\t%c\n", rig->caps->get_rit != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set XIT:\t%c\n", rig->caps->set_xit != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get XIT:\t%c\n", rig->caps->get_xit != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set CTCSS:\t%c\n", rig->caps->set_ctcss_tone != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get CTCSS:\t%c\n", rig->caps->get_ctcss_tone != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set DCS:\t%c\n", rig->caps->set_dcs_code != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get DCS:\t%c\n", rig->caps->get_dcs_code != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can set CTCSS Squelch:\t%c\n",
-            caps->set_ctcss_sql != NULL ? 'Y' : 'N');
+            rig->caps->set_ctcss_sql != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can get CTCSS Squelch:\t%c\n",
-            caps->get_ctcss_sql != NULL ? 'Y' : 'N');
+            rig->caps->get_ctcss_sql != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can set DCS Squelch:\t%c\n",
-            caps->set_dcs_sql != NULL ? 'Y' : 'N');
+            rig->caps->set_dcs_sql != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can get DCS Squelch:\t%c\n",
-            caps->get_dcs_sql != NULL ? 'Y' : 'N');
+            rig->caps->get_dcs_sql != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can set Power Stat:\t%c\n",
-            caps->set_powerstat != NULL ? 'Y' : 'N');
+            rig->caps->set_powerstat != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can get Power Stat:\t%c\n",
-            caps->get_powerstat != NULL ? 'Y' : 'N');
+            rig->caps->get_powerstat != NULL ? 'Y' : 'N');
 
-    fprintf(fout, "Can Reset:\t%c\n", caps->reset != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Ant:\t%c\n", caps->get_ant != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Ant:\t%c\n", caps->set_ant != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can Reset:\t%c\n", rig->caps->reset != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Ant:\t%c\n", rig->caps->get_ant != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Ant:\t%c\n", rig->caps->set_ant != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can set Transceive:\t%c\n",
-            caps->set_trn != NULL ? 'Y' : caps->transceive == RIG_TRN_RIG ? 'E' : 'N');
+            rig->caps->set_trn != NULL ? 'Y' : rig->caps->transceive == RIG_TRN_RIG ? 'E' : 'N');
 
-    fprintf(fout, "Can get Transceive:\t%c\n", caps->get_trn != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Func:\t%c\n", caps->set_func != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Func:\t%c\n", caps->get_func != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Level:\t%c\n", caps->set_level != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Level:\t%c\n", caps->get_level != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Param:\t%c\n", caps->set_parm != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Param:\t%c\n", caps->get_parm != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can send DTMF:\t%c\n", caps->send_dtmf != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can recv DTMF:\t%c\n", caps->recv_dtmf != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can send Morse:\t%c\n", caps->send_morse != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can stop Morse:\t%c\n", caps->stop_morse != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can wait Morse:\t%c\n", caps->wait_morse != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Transceive:\t%c\n", rig->caps->get_trn != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Func:\t%c\n", rig->caps->set_func != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Func:\t%c\n", rig->caps->get_func != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Level:\t%c\n", rig->caps->set_level != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Level:\t%c\n", rig->caps->get_level != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Param:\t%c\n", rig->caps->set_parm != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Param:\t%c\n", rig->caps->get_parm != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can send DTMF:\t%c\n", rig->caps->send_dtmf != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can recv DTMF:\t%c\n", rig->caps->recv_dtmf != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can send Morse:\t%c\n", rig->caps->send_morse != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can stop Morse:\t%c\n", rig->caps->stop_morse != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can wait Morse:\t%c\n", rig->caps->wait_morse != NULL ? 'Y' : 'N');
     fprintf(fout, "Can send Voice:\t%c\n",
-            caps->send_voice_mem != NULL ? 'Y' : 'N');
+            rig->caps->send_voice_mem != NULL ? 'Y' : 'N');
 
     fprintf(fout,
             "Can decode Events:\t%c\n",
-            caps->decode_event != NULL ? 'Y' : 'N');
+            rig->caps->decode_event != NULL ? 'Y' : 'N');
 
-    fprintf(fout, "Can set Bank:\t%c\n", caps->set_bank != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can set Mem:\t%c\n", caps->set_mem != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Mem:\t%c\n", caps->get_mem != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Bank:\t%c\n", rig->caps->set_bank != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can set Mem:\t%c\n", rig->caps->set_mem != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Mem:\t%c\n", rig->caps->get_mem != NULL ? 'Y' : 'N');
 
-    can_echannel = caps->set_mem
-                   && ((caps->set_vfo
+    can_echannel = rig->caps->set_mem
+                   && ((rig->caps->set_vfo
                         && ((rig->state.vfo_list & RIG_VFO_MEM) == RIG_VFO_MEM))
-                       || (caps->vfo_op
+                       || (rig->caps->vfo_op
                            && rig_has_vfo_op(rig, RIG_OP_TO_VFO | RIG_OP_FROM_VFO)));
 
     fprintf(fout,
             "Can set Channel:\t%c\n",
-            caps->set_channel != NULL ? 'Y' : (can_echannel ? 'E' : 'N'));
+            rig->caps->set_channel != NULL ? 'Y' : (can_echannel ? 'E' : 'N'));
 
     fprintf(fout,
             "Can get Channel:\t%c\n",
-            caps->get_channel != NULL ? 'Y' : (can_echannel ? 'E' : 'N'));
+            rig->caps->get_channel != NULL ? 'Y' : (can_echannel ? 'E' : 'N'));
 
-    fprintf(fout, "Can ctl Mem/VFO:\t%c\n", caps->vfo_op != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can Scan:\t%c\n", caps->scan != NULL ? 'Y' : 'N');
-    fprintf(fout, "Can get Info:\t%c\n", caps->get_info != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can ctl Mem/VFO:\t%c\n", rig->caps->vfo_op != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can Scan:\t%c\n", rig->caps->scan != NULL ? 'Y' : 'N');
+    fprintf(fout, "Can get Info:\t%c\n", rig->caps->get_info != NULL ? 'Y' : 'N');
     fprintf(fout, "Can get power2mW:\t%c\n", caps->power2mW != NULL ? 'Y' : 'N');
     fprintf(fout, "Can get mW2power:\t%c\n", caps->mW2power != NULL ? 'Y' : 'N');
 
@@ -926,186 +926,6 @@ int dumpcaps(RIG *rig, FILE *fout)
 
     return backend_warnings;
 }
-
-void range_print(FILE *fout, const struct freq_range_list range_list[], int rx)
-{
-    int i;
-    char prntbuf[1024];  /* a malloc would be better.. */
-
-    for (i = 0; i < HAMLIB_FRQRANGESIZ; i++)
-    {
-        if (range_list[i].startf == 0 && range_list[i].endf == 0)
-        {
-            break;
-        }
-
-        fprintf(fout, "\t%.0f Hz - %.0f Hz\n", range_list[i].startf,
-                range_list[i].endf);
-
-        fprintf(fout, "\t\tVFO list: ");
-        rig_sprintf_vfo(prntbuf, sizeof(prntbuf), range_list[i].vfo);
-        fprintf(fout, "%s", prntbuf);
-        fprintf(fout, "\n");
-
-        fprintf(fout, "\t\tMode list: ");
-        rig_sprintf_mode(prntbuf, sizeof(prntbuf), range_list[i].modes);
-        fprintf(fout, "%s", prntbuf);
-        fprintf(fout, "\n");
-
-        fprintf(fout, "\t\tAntenna list: ");
-        rig_sprintf_ant(prntbuf, sizeof(prntbuf), range_list[i].ant);
-        fprintf(fout, "%s", prntbuf);
-        fprintf(fout, "\n");
-
-        if (!rx)
-        {
-            char *label_lo = "W";
-            char *label_hi = "W";
-            double low = range_list[i].low_power / 1000.0f;
-            double hi = range_list[i].high_power / 1000.0f;
-
-            if (low < 0)
-            {
-                label_lo = "mW";
-                low *= 1000;
-            }
-
-            if (low < 0)
-            {
-                label_lo = "uW";
-                low *= 1000;
-            }
-
-            if (hi < 0)
-            {
-                label_hi = "mW";
-                hi *= 1000;
-            }
-
-            if (hi < 0)
-            {
-                label_hi = "uW";
-                hi *= 1000;
-            }
-
-            fprintf(fout, "\t\tLow power: %g %s, High power: %g %s\n", low, label_lo, hi,
-                    label_hi);
-        }
-    }
-}
-
-/*
- * check for:
- * - start_freq < end_freq  return_code = -1
- * - modes are not 0        return_code = -2
- * - if(rx), low_power, high_power set to -1        return_code = -3
- *     else, power is > 0
- * - array is ended by a {0,0,0,0,0} element (before boundary) rc = -4
- * - ranges with same modes do not overlap      rc = -5
- * ->fprintf(stderr,)!
- *
- * TODO: array is sorted in ascending freq order
- */
-int range_sanity_check(const struct freq_range_list range_list[], int rx)
-{
-    int i;
-
-    for (i = 0; i < HAMLIB_FRQRANGESIZ; i++)
-    {
-        if (range_list[i].startf == 0 && range_list[i].endf == 0)
-        {
-            break;
-        }
-
-        if (range_list[i].startf > range_list[i].endf)
-        {
-            return -1;
-        }
-
-        if (range_list[i].modes == 0)
-        {
-            return -2;
-        }
-
-        if (rx)
-        {
-            if (range_list[i].low_power > 0 && range_list[i].high_power > 0)
-            {
-                return -3;
-            }
-        }
-        else
-        {
-            if (!(range_list[i].low_power >= RIG_FREQ_NONE
-                    && range_list[i].high_power >= RIG_FREQ_NONE))
-            {
-                return -3;
-            }
-
-            if (range_list[i].low_power > range_list[i].high_power)
-            {
-                return -3;
-            }
-        }
-    }
-
-    if (i == HAMLIB_FRQRANGESIZ)
-    {
-        return -4;
-    }
-
-    return 0;
-}
-
-/*
- * check for:
- * - steps sorted in ascending order return_code=-1
- * - modes are not 0        return_code=-2
- * - array is ended by a {0,0,0,0,0} element (before boundary) rc=-4
- *
- * TODO: array is sorted in ascending freq order
- */
-int ts_sanity_check(const struct tuning_step_list tuning_step[])
-{
-    int i;
-    shortfreq_t last_ts;
-    rmode_t last_modes;
-
-    last_ts = 0;
-    last_modes = RIG_MODE_NONE;
-
-    for (i = 0; i < HAMLIB_TSLSTSIZ; i++)
-    {
-        if (RIG_IS_TS_END(tuning_step[i]))
-        {
-            break;
-        }
-
-        if (tuning_step[i].ts != RIG_TS_ANY
-                && tuning_step[i].ts < last_ts
-                && last_modes == tuning_step[i].modes)
-        {
-
-            return -1;
-        }
-
-        if (tuning_step[i].modes == 0)
-        {
-            return -2;
-        }
-
-        last_ts = tuning_step[i].ts;
-        last_modes = tuning_step[i].modes;
-    }
-
-    if (i == HAMLIB_TSLSTSIZ)
-    {
-        return -4;
-    }
-
-    return 0;
-}
-
 
 static void dump_chan_caps(const channel_cap_t *chan, FILE *fout)
 {
@@ -1228,13 +1048,4 @@ static void dump_chan_caps(const channel_cap_t *chan, FILE *fout)
     {
         fprintf(fout, "EXTLVL ");
     }
-}
-
-
-int dumpconf(RIG *rig, FILE *fout)
-{
-    fprintf(fout, "model: %s\n", rig->caps->model_name);
-    rig_token_foreach(rig, print_conf_list, (rig_ptr_t)rig);
-
-    return 0;
 }

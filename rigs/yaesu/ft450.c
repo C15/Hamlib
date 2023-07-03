@@ -39,7 +39,7 @@ const struct rig_caps ft450_caps =
     RIG_MODEL(RIG_MODEL_FT450),
     .model_name =         "FT-450",
     .mfg_name =           "Yaesu",
-    .version =            NEWCAT_VER ".2",
+    .version =            NEWCAT_VER ".3",
     .copyright =          "LGPL",
     .status =             RIG_STATUS_STABLE,
     .rig_type =           RIG_TYPE_TRANSCEIVER,

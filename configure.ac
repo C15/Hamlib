@@ -49,7 +49,7 @@ dnl added to AC_CONFIG_FILES near the end of this file.  See README.developer
 dnl Beware of duplication should a backend directory include both rig and
 dnl rotor definitions, e.g. "dummy".  Optional backends will not be listed
 dnl here but will be added later, e.g. "winradio".
-RIG_BACKEND_LIST="rigs/adat rigs/alinco rigs/aor rigs/barrett rigs/codan rigs/dorji rigs/drake rigs/dummy rigs/elad rigs/flexradio rigs/icom rigs/icmarine rigs/jrc rigs/kachina rigs/kenwood rigs/kit rigs/lowe rigs/pcr rigs/prm80 rigs/racal rigs/rft rigs/rs rigs/skanti rigs/tapr rigs/tentec rigs/tuner rigs/uniden rigs/winradio rigs/wj rigs/yaesu rigs/gomspace rigs/mds rigs/primesat"
+RIG_BACKEND_LIST="rigs/adat rigs/alinco rigs/aor rigs/barrett rigs/codan rigs/dorji rigs/drake rigs/dummy rigs/elad rigs/flexradio rigs/icom rigs/icmarine rigs/jrc rigs/kachina rigs/kenwood rigs/kit rigs/lowe rigs/pcr rigs/prm80 rigs/racal rigs/rft rigs/rs rigs/skanti rigs/tapr rigs/tentec rigs/tuner rigs/uniden rigs/winradio rigs/wj rigs/yaesu rigs/gomspace rigs/mds rigs/anytone/primesat"
 ROT_BACKEND_LIST="rotators/amsat rotators/apex rotators/ars rotators/celestron rotators/cnctrk rotators/grbltrk rotators/easycomm rotators/ether6 rotators/flir rotators/fodtrack rotators/gs232a rotators/heathkit rotators/m2 rotators/meade rotators/rotorez rotators/sartek rotators/saebrtrack rotators/spid rotators/ts7400 rotators/prosistel rotators/ioptron rotators/satel rotators/radant"
 # Amplifiers are all in the amplifiers directory
 AMP_BACKEND_LIST="amplifiers/elecraft amplifiers/gemini amplifiers/expert"
@@ -382,12 +382,14 @@ AS_IF([test x"$ax_cv_lib_readline" = "xno"], [
 
 dnl Check if INDI support in rigctl/rotctl is wanted
 AC_MSG_CHECKING([whether to use INDI in rigctl/rotctl])
-AC_ARG_WITH([indi],
-    [AS_HELP_STRING([--without-indi],
-	[disable INDI in rigctl/rotctl @<:@default=yes@:>@])],
-	[cf_with_indi_support=no],
-	[cf_with_indi_support=yes]
+AS_IF([test x"${cf_with_cxx_binding}" = "xyes"], [
+    AC_ARG_WITH([indi],
+        [AS_HELP_STRING([--without-indi],
+    	[disable INDI in rigctl/rotctl @<:@default=yes@:>@])],
+    	[cf_with_indi_support=no],
+    	[cf_with_indi_support=yes]
     )
+])
 
 AS_IF([test x"$cf_with_indi_support" != "xno"], [
     # INDI support needs a C++ compiler, tested for presence above.
@@ -912,6 +914,7 @@ rigs/wj/Makefile
 rigs/yaesu/Makefile
 rigs/gomspace/Makefile
 rigs/mds/Makefile
+rigs/anytone/Makefile
 tests/Makefile
 scripts/Makefile
 android/Makefile

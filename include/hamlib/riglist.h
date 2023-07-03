@@ -198,6 +198,7 @@
 #define RIG_MODEL_LAB599_TX500 RIG_MAKE_MODEL(RIG_KENWOOD,50)
 #define RIG_MODEL_SDRUNO RIG_MAKE_MODEL(RIG_KENWOOD,51)
 #define RIG_MODEL_QRPLABS RIG_MAKE_MODEL(RIG_KENWOOD,52)
+#define RIG_MODEL_FX4 RIG_MAKE_MODEL(RIG_KENWOOD,53)
 
 /*
  * Icom
@@ -285,6 +286,7 @@
 #define RIG_MODEL_X6100 RIG_MAKE_MODEL(RIG_ICOM, 87)    /* Xiegu X6100 */
 #define RIG_MODEL_G90 RIG_MAKE_MODEL(RIG_ICOM, 88)    /* Xiegu G90 */
 #define RIG_MODEL_X5105 RIG_MAKE_MODEL(RIG_ICOM, 89)    /* Xiegu X5105 -- G90 compatible */
+#define RIG_MODEL_IC905 RIG_MAKE_MODEL(RIG_ICOM, 90)    
 
 /*
  * Optoelectronics (CI-V)
@@ -660,6 +662,14 @@
     RIG_MODEL_E1800,    DASA-Telefunken
     etc.
 */
+
+/*
+ * AnyTone rigs
+ */
+#define RIG_ANYTONE 37
+#define RIG_BACKEND_ANYTONE "AnyTone"
+#define RIG_MODEL_ATD578UVIII RIG_MAKE_MODEL(RIG_ANYTONE, 1)
+
 
 //! @endcond
 

@@ -246,9 +246,16 @@ int kenwood_transaction(RIG *rig, const char *cmdstr, char *data,
     struct kenwood_priv_caps *caps = kenwood_caps(rig);
     struct rig_state *rs;
 
-    rig_debug(RIG_DEBUG_VERBOSE, "%s called cmd=%s datasize=%d\n", __func__,
+    if (datasize > 0 && datasize < (cmdstr ? strlen(cmdstr) : 0)) {
+    rig_debug(RIG_DEBUG_WARN, "%s called cmd=%s datasize=%d, datasize < cmd length?\n", __func__,
               cmdstr ? cmdstr : "(NULL)",
               (int)datasize);
+    } 
+    else
+    {
+    rig_debug(RIG_DEBUG_VERBOSE, "%s called cmd=%s\n", __func__,
+              cmdstr ? cmdstr : "(NULL)");
+    }
 
     if ((!cmdstr && !datasize) || (datasize && !data))
     {
@@ -321,15 +328,6 @@ transaction_write:
         /* flush anything in the read buffer before command is sent */
         rig_flush(&rs->rigport);
 
-        // PS command may need to wake up serial port
-        if (priv->ps_cmd_wakeup_data)
-        {
-            if (strncmp(cmd, "PS", 2) == 0)
-            {
-                write_block(&rs->rigport, (unsigned char *) ";;;;", 4);
-            }
-        }
-
         retval = write_block(&rs->rigport, (unsigned char *) cmd, len);
 
         free(cmd);
@@ -385,13 +383,15 @@ transaction_write:
 
 transaction_read:
     /* allow room for most any response */
+    // this len/expected stuff is confusing -- logic in some places includes the semicolon
+    // so we add 1 to our read_string length to cover these cases
+    // eventually we should be able to get rid of this but requires testing all Kenwood rigs
     len = min(datasize ? datasize + 1 : strlen(priv->verify_cmd) + 48,
               KENWOOD_MAX_BUF_LEN);
     retval = read_string(&rs->rigport, (unsigned char *) buffer, len,
                          cmdtrm_str, strlen(cmdtrm_str), 0, 1);
-    rig_debug(RIG_DEBUG_TRACE, "%s: read_string(expected=%d, len=%d)='%s'\n",
-              __func__,
-              len, (int)strlen(buffer), buffer);
+    rig_debug(RIG_DEBUG_TRACE, "%s: read_string len=%d '%s'\n", __func__,
+              (int)strlen(buffer), buffer);
 
     if (retval < 0)
     {
@@ -544,19 +544,8 @@ transaction_read:
      */
     if (datasize)
     {
-        char *ps_cmd;
-
-        if (priv->ps_cmd_wakeup_data)
-        {
-            ps_cmd = ";;;;PS";
-        }
-        else
-        {
-            ps_cmd = "PS";
-        }
-
         // we ignore the special PS command
-        if (cmdstr && strcmp(cmdstr, ps_cmd) != 0 && (buffer[0] != cmdstr[0]
+        if (cmdstr && strcmp(cmdstr, "PS") != 0 && (buffer[0] != cmdstr[0]
                 || (cmdstr[1] && buffer[1] != cmdstr[1])))
         {
             /*
@@ -1163,11 +1152,26 @@ int kenwood_get_if(RIG *rig)
 {
     struct kenwood_priv_data *priv = rig->state.priv;
     struct kenwood_priv_caps *caps = kenwood_caps(rig);
+    int retval;
+    int post_write_delay_save = 0;
 
     ENTERFUNC;
+    
+    // Malachite has a 400ms delay but some get commands can work with no delay
+    if (RIG_IS_MALACHITE)
+    {
+        post_write_delay_save = rig->state.post_write_delay;
+        rig->state.post_write_delay = 0;
+    }
 
-    RETURNFUNC(kenwood_safe_transaction(rig, "IF", priv->info,
-                                        KENWOOD_MAX_BUF_LEN, caps->if_len));
+    retval = kenwood_safe_transaction(rig, "IF", priv->info,
+                                        KENWOOD_MAX_BUF_LEN, caps->if_len);
+
+    if (RIG_IS_MALACHITE)
+    {
+        rig->state.post_write_delay = post_write_delay_save;
+    }
+    RETURNFUNC(retval);
 }
 
 
@@ -1253,7 +1257,7 @@ int kenwood_set_vfo(RIG *rig, vfo_t vfo)
         rig_debug(RIG_DEBUG_VERBOSE, "%s: checking satellite mode status\n", __func__);
         SNPRINTF(cmdbuf, sizeof(cmdbuf), "SA");
 
-        retval = kenwood_transaction(rig, cmdbuf, retbuf, 20);
+        retval = kenwood_transaction(rig, cmdbuf, retbuf, 4);
 
         if (retval != RIG_OK)
         {
@@ -1870,12 +1874,16 @@ int kenwood_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
         if (RIG_OK != err) { RETURNFUNC2(err); }
     }
 
+    // Malchite is so slow we don't do the get_freq
+    if (!RIG_IS_MALACHITE)
+    {
     rig_get_freq(rig, tvfo, &tfreq);
 
     if (tfreq == freq)
     {
         rig_debug(RIG_DEBUG_TRACE, "%s: no freq change needed\n", __func__);
         RETURNFUNC2(RIG_OK);
+    }
     }
 
     switch (tvfo)
@@ -3187,7 +3195,7 @@ int kenwood_set_level(RIG *rig, vfo_t vfo, setting_t level, value_t val)
 
         if (RIG_IS_TS2000)
         {
-            vfo_num = (vfo == RIG_VFO_C) ? 1 : 0;
+            vfo_num = (vfo == RIG_VFO_B) ? 1 : 0;
         }
         else
         {
@@ -3257,7 +3265,7 @@ int kenwood_set_level(RIG *rig, vfo_t vfo, setting_t level, value_t val)
 
         if (RIG_IS_TS2000)
         {
-            vfo_num = (vfo == RIG_VFO_C) ? 1 : 0;
+            vfo_num = (vfo == RIG_VFO_B || vfo == RIG_VFO_SUB) ? 1 : 0;
         }
         else
         {
@@ -3517,7 +3525,7 @@ int kenwood_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
         {
             len = 3;
 
-            if (vfo == RIG_VFO_C)
+            if (vfo == RIG_VFO_B || vfo == RIG_VFO_SUB)
             {
                 cmd = "SM1";
             }
@@ -3555,7 +3563,7 @@ int kenwood_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
         {
             len = 3;
 
-            if (vfo == RIG_VFO_C)
+            if (vfo == RIG_VFO_B || vfo == RIG_VFO_SUB)
             {
                 cmd = "SM1";
                 // TS-2000 sub-transceiver S-meter range is half of the main one
@@ -3601,7 +3609,7 @@ int kenwood_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
 
         if (RIG_IS_TS2000)
         {
-            vfo_num = (vfo == RIG_VFO_C) ? 1 : 0;
+            vfo_num = (vfo == RIG_VFO_B || vfo == RIG_VFO_SUB) ? 1 : 0;
         }
         else
         {
@@ -3788,7 +3796,7 @@ int kenwood_get_level(RIG *rig, vfo_t vfo, setting_t level, value_t *val)
 
         if (RIG_IS_TS2000)
         {
-            vfo_num = (vfo == RIG_VFO_C) ? 1 : 0;
+            vfo_num = (vfo == RIG_VFO_B || vfo == RIG_VFO_SUB) ? 1 : 0;
         }
         else
         {
@@ -4853,7 +4861,7 @@ int kenwood_set_ptt(RIG *rig, vfo_t vfo, ptt_t ptt)
         case RIG_PTT_ON:
         case RIG_PTT_ON_MIC:
         case RIG_PTT_ON_DATA:
-            ptt_cmd = (vfo == RIG_VFO_C) ? "TX1" : "TX0";
+            ptt_cmd = "VX0;TX";
             break;
 
         case RIG_PTT_OFF:
@@ -4955,7 +4963,7 @@ int kenwood_get_dcd(RIG *rig, vfo_t vfo, dcd_t *dcd)
     }
 
     if ((RIG_IS_TS990S && RIG_VFO_SUB == vfo) ||
-            (RIG_IS_TS2000 && RIG_VFO_C == vfo))
+            (RIG_IS_TS2000 && (RIG_VFO_B == vfo || RIG_VFO_SUB == vfo)))
     {
         offs = 3;
     }
@@ -5051,6 +5059,7 @@ int kenwood_get_trn(RIG *rig, int *trn)
 int kenwood_set_powerstat(RIG *rig, powerstat_t status)
 {
     int retval;
+    struct rig_state *state = &rig->state;
     struct kenwood_priv_data *priv = rig->state.priv;
 
     if ((priv->is_k3 || priv->is_k3s) && status == RIG_POWER_ON)
@@ -5064,6 +5073,14 @@ int kenwood_set_powerstat(RIG *rig, powerstat_t status)
     int retry_save = rig->state.rigport.retry;
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called status=%d\n", __func__, status);
+
+    if (status == RIG_POWER_ON)
+    {
+        // When powering on a Kenwood rig needs dummy bytes to wake it up,
+        // then wait at least 200ms and within 2 seconds issue the power-on command again
+        write_block(&state->rigport, (unsigned char *) "PS1;", 4);
+        hl_usleep(500000);
+    }
 
     rig->state.rigport.retry = 0;
 
@@ -5108,7 +5125,8 @@ int kenwood_set_powerstat(RIG *rig, powerstat_t status)
 int kenwood_get_powerstat(RIG *rig, powerstat_t *status)
 {
     char pwrbuf[6];
-    int retval;
+    int result;
+    struct rig_state *state = &rig->state;
     struct kenwood_priv_data *priv = rig->state.priv;
 
     ENTERFUNC;
@@ -5124,22 +5142,61 @@ int kenwood_get_powerstat(RIG *rig, powerstat_t *status)
         RETURNFUNC(-RIG_EINVAL);
     }
 
-    char *ps_cmd;
+    // The first PS command has two purposes:
+    // 1. to detect that the rig is turned on/off when it responds with PS1/PS0 immediately
+    // 2. to act as dummy wake-up data for a rig that is turned off
 
-    if (priv->ps_cmd_wakeup_data)
+    // Timeout needs to be set temporarily to a low value,
+    // so that the second command can be sent in 2 seconds, which is what Kenwood rigs expect.
+    short retry_save;
+    short timeout_retry_save;
+    int timeout_save;
+
+    retry_save = state->rigport.retry;
+    timeout_retry_save = state->rigport.timeout_retry;
+    timeout_save = state->rigport.timeout;
+
+    state->rigport.retry = 0;
+    state->rigport.timeout_retry = 0;
+    state->rigport.timeout = 500;
+
+    result = kenwood_safe_transaction(rig, "PS", pwrbuf, 6, 3);
+
+    state->rigport.retry = retry_save;
+    state->rigport.timeout_retry = timeout_retry_save;
+    state->rigport.timeout = timeout_save;
+
+    // Rig may respond here already
+    if (result == RIG_OK)
     {
-        ps_cmd = ";;;;PS";
+        char ps = pwrbuf[2];
+
+        switch (ps)
+        {
+        case '1':
+            *status = RIG_POWER_ON;
+            RETURNFUNC(RIG_OK);
+
+        case '0':
+            *status = RIG_POWER_OFF;
+            RETURNFUNC(RIG_OK);
+
+        default:
+            // fall through to retry command
+            break;
+        }
     }
-    else
-    {
-        ps_cmd = "PS";
-    }
 
-    retval = kenwood_safe_transaction(rig, ps_cmd, pwrbuf, 6, 3);
+    // Kenwood rigs in powered-off state require the PS command to be sent
+    // after waiting for at least 200ms and within 2 seconds after dummy data
+    hl_usleep(500000);
+    // Discard any unsolicited data
+    rig_flush(&rig->state.rigport);
 
-    if (retval != RIG_OK)
+    result = kenwood_safe_transaction(rig, "PS", pwrbuf, 6, 3);
+    if (result != RIG_OK)
     {
-        RETURNFUNC(retval);
+        RETURNFUNC(result);
     }
 
     *status = pwrbuf[2] == '0' ? RIG_POWER_OFF : RIG_POWER_ON;
@@ -6048,6 +6105,7 @@ DECLARE_INITRIG_BACKEND(kenwood)
     rig_register(&tx500_caps);
     rig_register(&sdruno_caps);
     rig_register(&qrplabs_caps);
+    rig_register(&fx4_caps);
 
     return (RIG_OK);
 }

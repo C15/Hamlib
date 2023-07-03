@@ -666,8 +666,17 @@ int powersdr_set_level(RIG *rig, vfo_t vfo, setting_t level, value_t val)
     case RIG_LEVEL_RF:
         if (val.f > 1.0) { return -RIG_EINVAL; }
 
-        ival = val.f * (120 - -20) - 20;
-        SNPRINTF(cmd, sizeof(cmd) - 1, "ZZAR%+04d", ival);
+        if (rig->caps->rig_model == RIG_MODEL_POWERSDR)
+        {
+            ival = val.f * (120 - -20) - 20;
+            SNPRINTF(cmd, sizeof(cmd) - 1, "ZZAR%+04d", ival);
+        }
+        else
+        {
+            ival = val.f * 100;
+            SNPRINTF(cmd, sizeof(cmd) - 1, "ZZAR%03d", ival);
+        }
+
         break;
 
     case RIG_LEVEL_MICGAIN:
@@ -1102,7 +1111,7 @@ const struct rig_caps f6k_caps =
     RIG_MODEL(RIG_MODEL_F6K),
     .model_name =       "6xxx",
     .mfg_name =     "FlexRadio",
-    .version =      "20220306.0",
+    .version =      "20230606.0",
     .copyright =        "LGPL",
     .status =       RIG_STATUS_STABLE,
     .rig_type =     RIG_TYPE_TRANSCEIVER,
@@ -1122,7 +1131,9 @@ const struct rig_caps f6k_caps =
     .has_set_level =    F6K_LEVEL_ALL,
     .has_get_parm =     RIG_PARM_NONE,
     .has_set_parm =     RIG_PARM_NONE,  /* FIXME: parms */
-    .level_gran =       {},     /* FIXME: granularity */
+    .level_gran =       {
+        [LVL_KEYSPD] = { .min = { .i = 5 }, .max = { .i = 60 }, .step = { .i = 1 } },
+    },     /* FIXME: granularity */
     .parm_gran =        {},
     //.extlevels =      elecraft_ext_levels,
     //.extparms =       kenwood_cfg_params,
@@ -1231,7 +1242,7 @@ const struct rig_caps powersdr_caps =
     RIG_MODEL(RIG_MODEL_POWERSDR),
     .model_name =       "PowerSDR/Thetis",
     .mfg_name =     "FlexRadio/ANAN",
-    .version =      "20221123.0",
+    .version =      "20230608.0",
     .copyright =        "LGPL",
     .status =       RIG_STATUS_STABLE,
     .rig_type =     RIG_TYPE_TRANSCEIVER,
@@ -1260,7 +1271,9 @@ const struct rig_caps powersdr_caps =
     .has_set_level =    POWERSDR_LEVEL_SET,
     .has_get_parm =     RIG_PARM_NONE,
     .has_set_parm =     RIG_PARM_NONE,  /* FIXME: parms */
-    .level_gran =       {},     /* FIXME: granularity */
+    .level_gran =       {
+        [LVL_KEYSPD] = { .min = { .i = 5 }, .max = { .i = 60 }, .step = { .i = 1 } },
+    },     /* FIXME: granularity */
     .parm_gran =        {},
     //.extlevels =      elecraft_ext_levels,
     //.extparms =       kenwood_cfg_params,
@@ -1360,6 +1373,9 @@ const struct rig_caps powersdr_caps =
     .set_func =         powersdr_set_func,
     //.set_ant =       kenwood_set_ant_no_ack,
     //.get_ant =       kenwood_get_ant,
+    .send_morse =  kenwood_send_morse,
+    .stop_morse =  kenwood_stop_morse,
+    .wait_morse =  rig_wait_morse,
     .hamlib_check_rig_caps = HAMLIB_CHECK_RIG_CAPS
 };
 

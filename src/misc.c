@@ -972,6 +972,7 @@ static const struct
 int check_level_param(RIG *rig, setting_t level, value_t val, gran_t **gran)
 {
     gran_t *this_gran;
+    float maxval;
 
     this_gran = &rig->caps->level_gran[rig_setting2idx(level)];
 
@@ -982,13 +983,23 @@ int check_level_param(RIG *rig, setting_t level, value_t val, gran_t **gran)
 
     if (RIG_LEVEL_IS_FLOAT(level))
     {
-        /* If min==max==0, all values are OK here but may be checked later */
-        if (this_gran->min.f == 0.0f && this_gran->max.f == 0.0f)
+
+        /* If min==max==step==0, all values are OK here */
+        maxval = this_gran->max.f;
+
+        if (this_gran->min.f == 0.0f && maxval == 0.0f)
         {
-            return RIG_OK;
+            /* if step==0 also, we're good */
+            if (this_gran->step.f == 0.0f)
+            {
+                return RIG_OK;
+            }
+
+            /* non-zero step, check for max of 1.0 */
+            maxval = 1.0f;
         }
 
-        if (val.f < this_gran->min.f || val.f > this_gran->max.f)
+        if (val.f < this_gran->min.f || val.f > maxval)
         {
             return -RIG_EINVAL;
         }
@@ -2177,8 +2188,8 @@ int HAMLIB_API rig_flush_force(hamlib_port_t *port, int flush_async_data)
     }
 
 #ifndef RIG_FLUSH_REMOVE
-    rig_debug(RIG_DEBUG_TRACE, "%s: called for %s device\n", __func__,
-              port->type.rig == RIG_PORT_SERIAL ? "serial" : "network");
+//    rig_debug(RIG_DEBUG_TRACE, "%s: called for %s device\n", __func__,
+//              port->type.rig == RIG_PORT_SERIAL ? "serial" : "network");
 
     if (port->type.rig == RIG_PORT_NETWORK
             || port->type.rig == RIG_PORT_UDP_NETWORK)
@@ -2551,7 +2562,19 @@ long long HAMLIB_API rig_get_caps_int(rig_model_t rig_model,
                                       enum rig_caps_int_e rig_caps)
 {
     const struct rig_caps *caps = rig_get_caps(rig_model);
-    //rig_debug(RIG_DEBUG_TRACE, "%s: getting rig_caps=%u\n", __func__, rig_caps);
+#if 0
+    rig_debug(RIG_DEBUG_TRACE, "%s: getting rig_caps for model=%d, rig_caps=%d\n",
+              __func__, rig_model, rig_caps);
+#endif
+
+    if (caps == NULL)
+    {
+#if 0
+        rig_debug(RIG_DEBUG_ERR, "%s: called with NULL caps...returning -1\n",
+                  __func__);
+#endif
+        return -1;
+    }
 
     switch (rig_caps)
     {
@@ -2562,7 +2585,9 @@ long long HAMLIB_API rig_get_caps_int(rig_model_t rig_model,
         return caps->rig_model;
 
     case RIG_CAPS_PTT_TYPE:
-        //rig_debug(RIG_DEBUG_TRACE, "%s: return %u\n", __func__, caps->ptt_type);
+#if 0
+        rig_debug(RIG_DEBUG_TRACE, "%s: return %u\n", __func__, caps->ptt_type);
+#endif
         return caps->ptt_type;
 
     case RIG_CAPS_PORT_TYPE:
@@ -2572,7 +2597,9 @@ long long HAMLIB_API rig_get_caps_int(rig_model_t rig_model,
         return caps->has_get_level;
 
     default:
-        //rig_debug(RIG_DEBUG_ERR, "%s: Unknown rig_caps value=%lld\n", __func__, rig_caps);
+#if 0
+        rig_debug(RIG_DEBUG_ERR, "%s: Unknown rig_caps value=%d\n", __func__, rig_caps);
+#endif
         return (-RIG_EINVAL);
     }
 }
@@ -2581,6 +2608,13 @@ const char *HAMLIB_API rig_get_caps_cptr(rig_model_t rig_model,
         enum rig_caps_cptr_e rig_caps)
 {
     const struct rig_caps *caps = rig_get_caps(rig_model);
+
+    if (caps == NULL)
+    {
+//        rig_debug(RIG_DEBUG_ERR, "%s: called with NULL caps...returning NULL\n",
+//                  __func__);
+        return NULL;
+    }
 
     switch (rig_caps)
     {
@@ -2597,8 +2631,10 @@ const char *HAMLIB_API rig_get_caps_cptr(rig_model_t rig_model,
         return rig_strstatus(caps->status);
 
     default:
+#if 0
         rig_debug(RIG_DEBUG_ERR, "%s: Unknown requested rig_caps value=%d\n", __func__,
                   rig_caps);
+#endif
         return "Unknown caps value";
     }
 }
@@ -2685,6 +2721,11 @@ char *date_strget(char *buf, int buflen, int localtime)
              ((int)abs(mytimezone) / 3600) * 100);
     strcat(buf, tmpbuf);
     return buf;
+}
+
+char *rig_date_strget(char *buf, int buflen, int localtime)
+{
+    return date_strget(buf,buflen,localtime);
 }
 
 const char *spaces()

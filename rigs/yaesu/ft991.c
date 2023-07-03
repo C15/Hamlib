@@ -138,7 +138,7 @@ const struct rig_caps ft991_caps =
     RIG_MODEL(RIG_MODEL_FT991),
     .model_name =         "FT-991",
     .mfg_name =           "Yaesu",
-    .version =            NEWCAT_VER ".15",
+    .version =            NEWCAT_VER ".16",
     .copyright =          "LGPL",
     .status =             RIG_STATUS_STABLE,
     .rig_type =           RIG_TYPE_TRANSCEIVER,
@@ -163,7 +163,6 @@ const struct rig_caps ft991_caps =
     .has_set_parm =       RIG_PARM_NONE,
     .level_gran = {
 #include "level_gran_yaesu.h"
-        [LVL_NR] = { .min = { .f = 0 }, .max = { .f = 1 }, .step = { .f = 1.0f / 15.0f } },
     },
     .ctcss_list =         common_ctcss_list,
     .dcs_list =           common_dcs_list,

@@ -259,7 +259,7 @@ const struct rig_caps ft767gx_caps =
     RIG_MODEL(RIG_MODEL_FT767),
     .model_name =       "FT-767GX",
     .mfg_name =         "Yaesu",
-    .version =           "20210221.0",
+    .version =           "20230523.0",
     .copyright =         "LGPL",
     .status =            RIG_STATUS_STABLE,
     .rig_type =          RIG_TYPE_TRANSCEIVER,
@@ -488,7 +488,13 @@ int ft767_open(RIG *rig)
 
 int ft767_close(RIG *rig)
 {
-    rig_flush(&rig->state.rigport);
+    int retval = ft767_leave_CAT(rig);
+
+    if (retval < 0)
+    {
+        rig_debug(RIG_DEBUG_ERR, "%s: leave_CAT %d\n", __func__, retval);
+        return retval;
+    }
     return RIG_OK;
 }
 

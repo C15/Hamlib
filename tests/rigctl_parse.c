@@ -104,7 +104,7 @@ char rigctld_password[64];
 int is_passwordOK;
 int is_rigctld;
 extern int lock_mode; // used by rigctld
-extern int rig_powerstat;
+extern powerstat_t rig_powerstat;
 
 
 
@@ -378,6 +378,7 @@ static struct test_table test_list[] =
     { 0xa3, "get_lock_mode",     ACTION(get_lock_mode), ARG_NOVFO, "Locked" },
     { 0xa4, "send_raw",          ACTION(send_raw), ARG_NOVFO | ARG_IN1 | ARG_IN2 | ARG_OUT3, "Terminator", "Command", "Send raw answer" },
     { 0xa5, "client_version",    ACTION(client_version), ARG_NOVFO | ARG_IN1, "Version", "Client version" },
+    { 0xa6, "get_vfo_list",    ACTION(get_vfo_list), ARG_NOVFO },
     { 0x00, "", NULL },
 };
 
@@ -1732,8 +1733,7 @@ readline_repeat:
     else
     {
         // Allow only certain commands when the rig is powered off
-        if (retcode == RIG_OK && (rig_powerstat == RIG_POWER_OFF
-                                  || rig_powerstat == RIG_POWER_STANDBY)
+        if (my_rig->state.powerstat == RIG_POWER_OFF && (rig_powerstat == RIG_POWER_OFF || rig_powerstat == RIG_POWER_STANDBY)
                 && cmd_entry->cmd != '1' // dump_caps
                 && cmd_entry->cmd != '3' // dump_conf
                 && cmd_entry->cmd != 0x8f // dump_state
@@ -4355,7 +4355,18 @@ declare_proto_rig(dump_caps)
 {
     ENTERFUNC2;
 
-    dumpcaps(rig, fout);
+#if 1
+    if (rig->caps->rig_model == RIG_MODEL_NETRIGCTL)
+    {
+        char cmd[32];
+        SNPRINTF(cmd, sizeof(cmd), "\\dump_caps\n");
+        dumpstate(rig, fout);
+    }
+    else
+#endif
+    {
+        dumpcaps(rig, fout);
+    }
 
     RETURNFUNC2(RIG_OK);
 }
@@ -4468,6 +4479,7 @@ declare_proto_rig(dump_state)
     // protocol 1 allows fields can be listed/processed in any order
     // protocol 1 fields can be multi-line -- just write the thing to allow for it
     // backward compatible as new values will just generate warnings
+    rig_debug(RIG_DEBUG_ERR, "%s: chk_vfo_executed=%d\n", __func__, chk_vfo_executed);
     if (chk_vfo_executed) // for 3.3 compatiblility
     {
         fprintf(fout, "vfo_ops=0x%x\n", rig->caps->vfo_ops);
@@ -4524,13 +4536,44 @@ declare_proto_rig(dump_state)
             fprintf(fout, "\n");
         }
 
+
+        fprintf(fout, "level_gran=");
+
+        for (i = 0; i < RIG_SETTING_MAX; ++i)
+        {
+            if (RIG_LEVEL_IS_FLOAT(i))
+            {
+                fprintf(fout, "%d=%g,%g,%g;", i, rig->state.level_gran[i].min.f,
+                        rig->state.level_gran[i].max.f, rig->state.level_gran[i].step.f);
+            }
+            else
+            {
+                fprintf(fout, "%d=%d,%d,%d;", i, rig->state.level_gran[i].min.i,
+                        rig->state.level_gran[i].max.i, rig->state.level_gran[i].step.i);
+            }
+        }
+
+        fprintf(fout, "\nparm_gran=");
+
+        for (i = 0; i < RIG_SETTING_MAX; ++i)
+        {
+            if (RIG_LEVEL_IS_FLOAT(i))
+            {
+                fprintf(fout, "%d=%g,%g,%g;", i, rig->state.parm_gran[i].min.f,
+                        rig->state.parm_gran[i].max.f, rig->state.parm_gran[i].step.f);
+            }
+            else
+            {
+                fprintf(fout, "%d=%d,%d,%d;", i, rig->state.level_gran[i].min.i,
+                        rig->state.level_gran[i].max.i, rig->state.level_gran[i].step.i);
+            }
+        }
+        fprintf(fout, "\n");
+        
+        rig->state.rig_model = rig->caps->rig_model;
+        fprintf(fout, "rig_model=%d\n", rig->state.rig_model);
         fprintf(fout, "done\n");
     }
-
-#if 0 // why isn't this implemented?  Does anybody care?
-    gran_t level_gran[RIG_SETTING_MAX];   /*!< level granularity */
-    gran_t parm_gran[RIG_SETTING_MAX];  /*!< parm granularity */
-#endif
 
     RETURNFUNC2(RIG_OK);
 }
@@ -4722,8 +4765,12 @@ declare_proto_rig(set_powerstat)
     CHKSCN1ARG(sscanf(arg1, "%d", &stat));
 
     retval = rig_set_powerstat(rig, (powerstat_t) stat);
-    rig->state.powerstat = stat;
-    rig_powerstat = stat; // update our global so others can see powerstat
+
+    if (retval == RIG_OK)
+    {
+        rig_powerstat = stat; // update our global so others can see powerstat
+    }
+
     fflush(fin);
     RETURNFUNC2(retval);
 }
@@ -4749,8 +4796,8 @@ declare_proto_rig(get_powerstat)
         fprintf(fout, "%s: ", cmd->arg1);
     }
 
-    fprintf(fout, "%d\n", stat);
-    rig->state.powerstat = stat;
+    fprintf(fout, "%d%c", stat, resp_sep);
+    rig_powerstat = stat; // update our global so others can see powerstat
 
     RETURNFUNC2(status);
 }
@@ -4858,8 +4905,10 @@ declare_proto_rig(send_cmd)
         else
         {
             int nbytes = 0;
-            sscanf(arg2, "%d", &nbytes);
-            SNPRINTF(bufcmd, sizeof(bufcmd), "%c %s %d\n", cmd->cmd, arg1, nbytes);
+            int n = sscanf(arg2, "%d", &nbytes);
+
+            if (n == 1) {SNPRINTF(bufcmd, sizeof(bufcmd), "%c %s %d\n", cmd->cmd, arg1, nbytes);}
+            else {SNPRINTF(bufcmd, sizeof(bufcmd), "%c %s %s\n", cmd->cmd, arg1, arg2);}
         }
 
         cmd_len = strlen(bufcmd);
@@ -4898,7 +4947,7 @@ declare_proto_rig(send_cmd)
     if (simulate)
     {
         rig_debug(RIG_DEBUG_VERBOSE, "%s: simulating response for model %s\n",
-                __func__, rig->caps->model_name);
+                  __func__, rig->caps->model_name);
     }
     else
     {
@@ -4926,6 +4975,7 @@ declare_proto_rig(send_cmd)
     }
 
     retval = 0;
+
     do
     {
         if (arg2) { sscanf(arg2, "%d", &rxbytes); }
@@ -5048,6 +5098,7 @@ declare_proto_rig(chk_vfo)
 {
     ENTERFUNC2;
 
+rig_debug(RIG_DEBUG_ERR, "%s: **********************************\n", __func__);
     if ((interactive && prompt) || (interactive && !prompt && ext_resp))
     {
         fprintf(fout, "%s: ", cmd->arg1);    /* i.e. "Frequency" */
@@ -5297,7 +5348,7 @@ declare_proto_rig(set_clock)
     rig_debug(RIG_DEBUG_VERBOSE, "%s: utc_offset=%d\n", __func__, utc_offset);
 
     RETURNFUNC2(rig_set_clock(rig, year, mon, day, hour, min, sec, msec,
-                             utc_offset));
+                              utc_offset));
 }
 
 /* '0xf9' */
@@ -5490,7 +5541,9 @@ declare_proto_rig(send_raw)
 
     rig_debug(RIG_DEBUG_TRACE, "%s:\n", __func__);
 
-    result = rig_send_raw(rig, (unsigned char *)sendp, arg2_len, buf,buf_len, term);
+    result = rig_send_raw(rig, (unsigned char *)sendp, arg2_len, buf, buf_len,
+                          term);
+
     if (result < 0)
     {
         return result;

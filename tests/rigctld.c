@@ -1117,7 +1117,6 @@ int main(int argc, char *argv[])
 #ifdef HAVE_PTHREAD
     /* allow threads to finish current action */
     mutex_rigctld(1);
-    HAMLIB_TRACE;
 
     if (client_count)
     {
@@ -1125,17 +1124,13 @@ int main(int argc, char *argv[])
     }
 
     rig_close(my_rig);
-    HAMLIB_TRACE;
     mutex_rigctld(0);
-    HAMLIB_TRACE;
 #else
     rig_close(my_rig); /* close port */
 #endif
 
-    HAMLIB_TRACE;
     network_multicast_publisher_stop(my_rig);
 
-    HAMLIB_TRACE;
     rig_cleanup(my_rig); /* if you care about memory */
 
 #ifdef __MINGW32__
@@ -1278,14 +1273,17 @@ void *handle_socket(void *arg)
 
             if (retcode != 0) { rig_debug(RIG_DEBUG_VERBOSE, "%s: rigctl_parse retcode=%d\n", __func__, retcode); }
 
-            // update our power stat in case power gets turned off
-            if (retcode == -RIG_ETIMEOUT
-                    && my_rig->caps->get_powerstat) // if we get a timeout we might be powered off
+            // If we get a timeout, the rig might be powered off
+            // Update our power status in case power gets turned off
+            if (retcode == -RIG_ETIMEOUT && my_rig->caps->get_powerstat)
             {
                 rig_get_powerstat(my_rig, &powerstat);
                 rig_powerstat = powerstat;
 
-                if (powerstat == RIG_POWER_OFF) { retcode = -RIG_EPOWER; }
+                if (powerstat == RIG_POWER_OFF || powerstat == RIG_POWER_STANDBY)
+                {
+                    retcode = -RIG_EPOWER;
+                }
             }
         }
         else
