@@ -50,7 +50,7 @@
 
 #define CMDSLEEP 20*1000  /* ms for each command */
 
-struct primesat_message_data
+struct primesat_message
 {
     char start_flag;
     char az_flag[2];
@@ -72,20 +72,16 @@ struct primesat_message_data
     char g2;
     char checksum;
     char end_flag;
-
-}
+};
 
 struct primesat_priv_data
 {
-    /* current vfo already in rig_state ? */
+    struct primesat_message *message_data;
+
+    freq_t uplink;
+    freq_t downlink;
     vfo_t tx_vfo;
-    //#value_t parms[RIG_SETTING_MAX];
-
-    channel_t *curr;    /* points to vfo_a, vfo_b or mem[] */
-
-    // we're trying to emulate all sorts of vfo possibilities so this looks redundant
-    channel_t vfo_main_a;
-    channel_t vfo_sub_b;
+    split_t split_on;
 
     //#struct ext_list *ext_funcs;
     //#struct ext_list *ext_parms;
@@ -97,7 +93,7 @@ struct primesat_priv_data
     //freq_t freq_vfob;
 };
 
-/* levels pertain to each VFO */
+/* levels pertain to each VFO
 static const struct confparams primesat_ext_levels[] =
 {
     {
@@ -117,8 +113,9 @@ static const struct confparams primesat_ext_levels[] =
         "VALUE1", RIG_CONF_COMBO, { .c = { .combostr = { "VALUE1", "VALUE2", "NONE", NULL } } }
     },
     { RIG_CONF_END, NULL, }
-};
+}; */
 
+/*
 static const struct confparams primesat_ext_funcs[] =
 {
     {
@@ -126,9 +123,9 @@ static const struct confparams primesat_ext_funcs[] =
         NULL, RIG_CONF_CHECKBUTTON
     },
     { RIG_CONF_END, NULL, }
-};
+}; */
 
-/* parms pertain to the whole rig */
+/* parms pertain to the whole rig 
 static const struct confparams primesat_ext_parms[] =
 {
     {
@@ -136,9 +133,9 @@ static const struct confparams primesat_ext_parms[] =
         NULL, RIG_CONF_NUMERIC, { .n = { 0, 1, .001 } }
     },
     { RIG_CONF_END, NULL, }
-};
+}; */
 
-/* cfgparams are configuration item generally used by the backend's open() method */
+/* cfgparams are configuration item generally used by the backend's open() method
 static const struct confparams primesat_cfg_params[] =
 {
     {
@@ -150,37 +147,69 @@ static const struct confparams primesat_cfg_params[] =
         "0", RIG_CONF_CHECKBUTTON, { }
     },
     { RIG_CONF_END, NULL, }
-};
+}; */
 
 /********************************************************************/
 
-static void init_message_data(primesat_message_data *data)
+static void init_message_data(struct primesat_message *data)
 {
     data->start_flag='$';
-    data->az_flag='AZ';
-    data->el_flag='EL';
-    data->ul_flag='UL';
-    data->dl_flag='DL';
+    memcpy(data->az_flag, (void *) "AZ", 2);
+    memcpy(data->az, (void *) "100", 3);
+    memcpy(data->el_flag, (void *) "EL", 2);
+    memcpy(data->el, (void *) "020", 3);
+    memcpy(data->ul_flag, (void *) "UL", 2);
+    memcpy(data->dl_flag, (void *) "DL", 2);
+    memcpy(data->ul, (void *) "0145.000001", 11);
     data->st1=0b10100110; //Hardcoded for icom radio, uplink and downlink update, G5500 rotator, no rotator update
     data->st2=0b01101101; //Hardcoded for fm uplink and downlink, and 9600 radio connection
     data->st3=0b10000001; //Hardcoded for ic910 radio
-    data->civ1=0x1;       //Hardcoded for ic910 address
-    data->civ2=0x2;       //Hardcoded for ic910 address
-    //Dont care about following fields, only usefull for rotator
+    data->civ1=0x60;       //Hardcoded for ic910 address
+    data->civ2=0x60;       //Hardcoded for ic910 address
+    //Dont care about following fields, only useful for rotator
     data->v1=0x01;
     data->v2=0x01;
     data->g1=0x01;
     data->g2=0x01;
     //data->checksum must be calculated for every message
+    data->end_flag='#';
 }
 
+static void fill_frequency_members(char *msg_freq, uint32_t aux)
+{
+    int temp;
+    for(int i=0; i<6; i+=1)
+        {
+            temp = aux % 10;
+            aux /= 10;
+            msg_freq[10-i] = (char) temp + 48;
+        }
 
+        for(int i=0; i<4; i+=1)
+        {
+            temp = aux % 10;
+            aux /= 10;
+            msg_freq[3-i] = (char) temp + 48;
+        }
+}
+
+static void calculate_checksum (struct primesat_message *data)
+{
+    //reset checksum
+    data->checksum = data->az_flag[0];
+    for(int i=0; i<44; i+=1)
+    {
+        data->checksum ^= (uint8_t) *( (uint8_t *)data+2+i);
+    }
+}
+
+/*
 static void copy_chan(channel_t *dest, const channel_t *src)
 {
     struct ext_list *saved_ext_levels;
     int i;
 
-    /* TODO: ext_levels[] of different sizes */
+    //TODO: ext_levels[] of different sizes
 
     for (i = 0; !RIG_IS_EXT_END(src->ext_levels[i]) &&
             !RIG_IS_EXT_END(dest->ext_levels[i]); i++)
@@ -191,30 +220,32 @@ static void copy_chan(channel_t *dest, const channel_t *src)
     saved_ext_levels = dest->ext_levels;
     memcpy(dest, src, sizeof(channel_t));
     dest->ext_levels = saved_ext_levels;
-}
+} */
 
 static int primesat_init(RIG *rig)
 {
     struct primesat_priv_data *priv;
-    struct primesat_message_data *message_data;
-    int i;
 
     ENTERFUNC;
+
     priv = (struct primesat_priv_data *)calloc(1, sizeof(struct primesat_priv_data));
     if (!priv)
     {
         RETURNFUNC(-RIG_ENOMEM);
     }
 
-    rig->state.priv = (void *)priv;
-
-    message_data = (struct primesat_message_data *)calloc(1, sizeof(struct primesat_message_data));
-    if (!message_data)
+    priv->message_data = (struct primesat_message *)calloc(1, sizeof(struct primesat_message));
+    if (!priv->message_data)
     {
+        free(priv);
         RETURNFUNC(-RIG_ENOMEM);
     }
 
-    init_message_data(message_data);
+    rig->state.priv = (void *)priv;
+
+    init_message_data(priv->message_data);
+
+    priv->split_on = RIG_SPLIT_ON; //Primesat is always split
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called\n", __func__);
 
@@ -224,15 +255,23 @@ static int primesat_init(RIG *rig)
 static int primesat_cleanup(RIG *rig)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
-    int i;
 
     ENTERFUNC;
 
-    free(priv->vfo_a.ext_levels);
-    free(priv->vfo_b.ext_levels);
-    free(priv->ext_funcs);
-    free(priv->ext_parms);
-    free(priv->magic_conf);
+    //free(priv->vfo_a.ext_levels);
+    //free(priv->vfo_b.ext_levels);
+    //free(priv->ext_funcs);
+    //free(priv->ext_parms);
+    //free(priv->magic_conf);
+
+    
+
+    if (priv->message_data)
+    {
+        free(priv->message_data);
+    }    
+
+    priv->message_data = NULL;
 
     if (rig->state.priv)
     {
@@ -255,11 +294,10 @@ static int primesat_close(RIG *rig)
 {
     ENTERFUNC;
 
-    usleep(CMDSLEEP);
-
     RETURNFUNC(RIG_OK);
 }
 
+/*
 static int primesat_set_conf(RIG *rig, token_t token, const char *val)
 {
     struct primesat_priv_data *priv;
@@ -279,21 +317,35 @@ static int primesat_get_conf(RIG *rig, token_t token, char *val)
     priv = (struct primesat_priv_data *)rig->state.priv;
 
     RETURNFUNC(RIG_OK);
-}
+}*/
 
 static int primesat_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
-    char fstr[20];
+    struct primesat_message *data = priv->message_data;
 
     ENTERFUNC;
 
-    rig_debug(RIG_DEBUG_TRACE, "%s: curr->freq=%.0f, curr->tx_freq=%.0f\n",
-              __func__,
-              priv->curr->freq, priv->curr->tx_freq);
+    //setting uplink
+    if(vfo == priv->tx_vfo)
+    {
+        priv->uplink = freq;
+        fill_frequency_members(data->ul, (uint32_t) freq);
+    }
+    else
+    {
+        priv->downlink = freq;
+        fill_frequency_members(data->dl, (uint32_t) freq);
+    }
+
+    calculate_checksum(data);
+    write_block(&rig->state.rigport, (void *) data, 48);
+
+
+    rig_debug(RIG_DEBUG_TRACE, "%s: uplink=%s\n downlink=%s\n",
+              __func__, data->ul, data->dl);
     RETURNFUNC(RIG_OK);
 }
-
 
 static int primesat_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
 {
@@ -303,11 +355,16 @@ static int primesat_get_freq(RIG *rig, vfo_t vfo, freq_t *freq)
 
     usleep(CMDSLEEP);
 
+    if(vfo == priv->tx_vfo)
+        *freq = priv->uplink;
+    else
+        *freq = priv->downlink;
+
     rig_debug(RIG_DEBUG_TRACE, "%s: freq=%.0f\n", __func__, *freq);
     RETURNFUNC(RIG_OK);
 }
 
-
+/*
 static int primesat_set_mode(RIG *rig, vfo_t vfo, rmode_t mode, pbwidth_t width)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
@@ -329,14 +386,12 @@ static int primesat_get_mode(RIG *rig, vfo_t vfo, rmode_t *mode, pbwidth_t *widt
     usleep(CMDSLEEP);
 
     RETURNFUNC(RIG_OK);
-}
+}*/
 
 
 static int primesat_set_vfo(RIG *rig, vfo_t vfo)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
-
     ENTERFUNC;
     usleep(CMDSLEEP);
     rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s\n", __func__, rig_strvfo(vfo));
@@ -349,9 +404,6 @@ static int primesat_get_vfo(RIG *rig, vfo_t *vfo)
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
 
     ENTERFUNC;
-    usleep(CMDSLEEP);
-    *vfo = priv->curr_vfo;
-
     RETURNFUNC(RIG_OK);
 }
 
@@ -364,9 +416,9 @@ static int primesat_set_split_freq(RIG *rig, vfo_t vfo, freq_t tx_freq)
     ENTERFUNC;
 
     retval = primesat_set_freq(rig, vfo, tx_freq);
-    priv->curr->tx_freq = tx_freq;
+    priv->uplink = tx_freq;
     rig_debug(RIG_DEBUG_VERBOSE, "%s: priv->curr->tx_freq = %.0f\n", __func__,
-              priv->curr->tx_freq);
+              priv->uplink);
 
     RETURNFUNC(retval);
 }
@@ -377,13 +429,14 @@ static int primesat_get_split_freq(RIG *rig, vfo_t vfo, freq_t *tx_freq)
 
     ENTERFUNC;
 
-    *tx_freq = priv->curr->tx_freq;
+    *tx_freq = priv->uplink;
     rig_debug(RIG_DEBUG_VERBOSE, "%s: priv->curr->tx_freq = %.0f\n", __func__,
-              priv->curr->tx_freq);
+              priv->uplink);
 
     RETURNFUNC(RIG_OK);
 }
 
+/*
 static int primesat_set_split_mode(RIG *rig, vfo_t vfo, rmode_t tx_mode,
                                 pbwidth_t tx_width)
 {
@@ -413,17 +466,17 @@ static int primesat_get_split_mode(RIG *rig, vfo_t vfo, rmode_t *tx_mode,
     *tx_width = curr->tx_width;
 
     RETURNFUNC(RIG_OK);
-}
+}*/
 
+//Primesat is always split
 static int primesat_set_split_vfo(RIG *rig, vfo_t vfo, split_t split, vfo_t tx_vfo)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
 
     ENTERFUNC;
     rig_debug(RIG_DEBUG_VERBOSE, "%s: split=%d, vfo=%s, tx_vfo=%s\n",
               __func__, split, rig_strvfo(vfo), rig_strvfo(tx_vfo));
-    curr->split = split;
+    
     priv->tx_vfo = tx_vfo;
 
     RETURNFUNC(RIG_OK);
@@ -434,16 +487,16 @@ static int primesat_get_split_vfo(RIG *rig, vfo_t vfo, split_t *split,
                                vfo_t *tx_vfo)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
-    channel_t *curr = priv->curr;
 
     ENTERFUNC;
-    *split = curr->split;
+    *split = priv->split_on;
+    *tx_vfo = priv->tx_vfo;
 
     RETURNFUNC(RIG_OK);
 }
 
 
-
+/*
 static int primesat_set_ts(RIG *rig, vfo_t vfo, shortfreq_t ts)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
@@ -465,9 +518,9 @@ static int primesat_get_ts(RIG *rig, vfo_t vfo, shortfreq_t *ts)
     *ts = curr->tuning_step;
 
     RETURNFUNC(RIG_OK);
-}
+} */
 
-
+/*
 static int primesat_set_ext_level(RIG *rig, vfo_t vfo, token_t token, value_t val)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
@@ -546,7 +599,7 @@ static int primesat_get_parm(RIG *rig, setting_t parm, value_t *val)
     ENTERFUNC;
 
     RETURNFUNC(RIG_OK);
-}
+} 
 
 static int primesat_set_ext_parm(RIG *rig, token_t token, value_t val)
 {
@@ -568,7 +621,7 @@ static int primesat_get_ext_parm(RIG *rig, token_t token, value_t *val)
     struct ext_list *epp;
 
     ENTERFUNC;
-    /* TODO: load value from priv->ext_parms */
+    //TODO: load value from priv->ext_parms
 
     RETURNFUNC(RIG_OK);
 }
@@ -586,7 +639,7 @@ static int primesat_vfo_op(RIG *rig, vfo_t vfo, vfo_op_t op)
               rig_strvfop(op));
 
     RETURNFUNC(RIG_OK);
-}
+}*/
 
 static const char *primesat_get_info(RIG *rig)
 {
@@ -604,8 +657,8 @@ static const char *primesat_get_info(RIG *rig)
 //#define primesat_FUNC  ((setting_t)-1ULL) /* All possible functions */
 //#define primesat_LEVEL (((setting_t)-1ULL)&~(1ULL<<27)) /* All levels except SQLSTAT */
 #define primesat_PARM  ((setting_t)-1ULL) /* All possible parms */
-#define primesat_VFO_OP  (RIG_OP_CPY | RIG_OP_XCHG) /* All possible VFO OPs */
-#define primesat_VFOS (RIG_VFO_MAIN| RIG_VFO_A | RIG_VFO_SUB | RIG_VFO_B)
+#define primesat_VFO_OP  (RIG_OP_NONE) /* All possible VFO OPs */
+#define primesat_VFOS (RIG_VFO_MAIN | RIG_VFO_SUB )
 #define primesat_MODES (RIG_MODE_LSB | RIG_MODE_USB | RIG_MODE_FM | \
                      RIG_MODE_FMN | RIG_MODE_AM | RIG_MODE_CW | \
                      RIG_MODE_CWR)
@@ -751,16 +804,16 @@ struct rig_caps primecontroller_caps =
     //.get_dcs_sql =    primesat_get_dcs_sql,
     .set_split_freq =     primesat_set_split_freq,
     .get_split_freq =     primesat_get_split_freq,
-    .set_split_mode =     primesat_set_split_mode,
-    .get_split_mode =     primesat_get_split_mode,
+    //#.set_split_mode =     primesat_set_split_mode,
+    //#.get_split_mode =     primesat_get_split_mode,
     .set_split_vfo =  primesat_set_split_vfo,
     .get_split_vfo =  primesat_get_split_vfo,
     //.set_rit =    primesat_set_rit,
     //.get_rit =    primesat_get_rit,
     //.set_xit =    primesat_set_xit,
     //.get_xit =    primesat_get_xit,
-    .set_ts =     primesat_set_ts,
-    .get_ts =     primesat_get_ts,
+    //.set_ts =     primesat_set_ts,
+    //.get_ts =     primesat_get_ts,
     //.set_ant =    primesat_set_ant,
     //.get_ant =    primesat_get_ant,
     //.set_bank =   primesat_set_bank,
