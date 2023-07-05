@@ -50,30 +50,48 @@
 
 #define CMDSLEEP 20*1000  /* ms for each command */
 
+struct primesat_message_data
+{
+    char start_flag;
+    char az_flag[2];
+    char az[3];
+    char el_flag[2];
+    char el[3];
+    char ul_flag[2];
+    char ul[11];
+    char dl_flag[2];
+    char dl[11];
+    char st1;
+    char st2;
+    char st3;
+    char civ1;
+    char civ2;
+    char v1;
+    char v2;
+    char g1;
+    char g2;
+    char checksum;
+    char end_flag;
+
+}
+
 struct primesat_priv_data
 {
     /* current vfo already in rig_state ? */
-    vfo_t curr_vfo;
-    vfo_t last_vfo; /* VFO A or VFO B, when in MEM mode */
-
-    split_t split;
     vfo_t tx_vfo;
-    int bank;
-    value_t parms[RIG_SETTING_MAX];
+    //#value_t parms[RIG_SETTING_MAX];
 
     channel_t *curr;    /* points to vfo_a, vfo_b or mem[] */
 
     // we're trying to emulate all sorts of vfo possibilities so this looks redundant
-    channel_t vfo_a;
-    channel_t vfo_b;
-    channel_t vfo_main;
-    channel_t vfo_sub;
+    channel_t vfo_main_a;
+    channel_t vfo_sub_b;
 
-    struct ext_list *ext_funcs;
-    struct ext_list *ext_parms;
+    //#struct ext_list *ext_funcs;
+    //#struct ext_list *ext_parms;
 
-    char *magic_conf;
-    int static_data;
+    //#char *magic_conf;
+    //#int static_data;
 
     //freq_t freq_vfoa;
     //freq_t freq_vfob;
@@ -136,6 +154,27 @@ static const struct confparams primesat_cfg_params[] =
 
 /********************************************************************/
 
+static void init_message_data(primesat_message_data *data)
+{
+    data->start_flag='$';
+    data->az_flag='AZ';
+    data->el_flag='EL';
+    data->ul_flag='UL';
+    data->dl_flag='DL';
+    data->st1=0b10100110; //Hardcoded for icom radio, uplink and downlink update, G5500 rotator, no rotator update
+    data->st2=0b01101101; //Hardcoded for fm uplink and downlink, and 9600 radio connection
+    data->st3=0b10000001; //Hardcoded for ic910 radio
+    data->civ1=0x1;       //Hardcoded for ic910 address
+    data->civ2=0x2;       //Hardcoded for ic910 address
+    //Dont care about following fields, only usefull for rotator
+    data->v1=0x01;
+    data->v2=0x01;
+    data->g1=0x01;
+    data->g2=0x01;
+    //data->checksum must be calculated for every message
+}
+
+
 static void copy_chan(channel_t *dest, const channel_t *src)
 {
     struct ext_list *saved_ext_levels;
@@ -157,6 +196,7 @@ static void copy_chan(channel_t *dest, const channel_t *src)
 static int primesat_init(RIG *rig)
 {
     struct primesat_priv_data *priv;
+    struct primesat_message_data *message_data;
     int i;
 
     ENTERFUNC;
@@ -167,6 +207,14 @@ static int primesat_init(RIG *rig)
     }
 
     rig->state.priv = (void *)priv;
+
+    message_data = (struct primesat_message_data *)calloc(1, sizeof(struct primesat_message_data));
+    if (!message_data)
+    {
+        RETURNFUNC(-RIG_ENOMEM);
+    }
+
+    init_message_data(message_data);
 
     rig_debug(RIG_DEBUG_VERBOSE, "%s called\n", __func__);
 
@@ -199,17 +247,6 @@ static int primesat_cleanup(RIG *rig)
 static int primesat_open(RIG *rig)
 {
     ENTERFUNC;
-
-    if (rig->caps->rig_model == RIG_MODEL_PRIMECONTROLLER)
-    {
-        // then we emulate a rig without set_vfo or get_vfo
-        rig_debug(RIG_DEBUG_VERBOSE, "%s: Emulating rig without get_vfo or set_vfo\n",
-                  __func__);
-        rig->caps->set_vfo = NULL;
-        rig->caps->get_vfo = NULL;
-    }
-
-    usleep(CMDSLEEP);
 
     RETURNFUNC(RIG_OK);
 }
@@ -659,23 +696,23 @@ struct rig_caps primecontroller_caps =
 
     .priv =  NULL,    /* priv */
 
-    .extlevels =    primesat_ext_levels,
-    .extfuncs =     primesat_ext_funcs,
-    .extparms =     primesat_ext_parms,
-    .cfgparams =    primesat_cfg_params,
+    //#.extlevels =    primesat_ext_levels,
+    //#.extfuncs =     primesat_ext_funcs,
+    //#.extparms =     primesat_ext_parms,
+    //#.cfgparams =    primesat_cfg_params,
 
     .rig_init =     primesat_init,
     .rig_cleanup =  primesat_cleanup,
     .rig_open =     primesat_open,
     .rig_close =    primesat_close,
 
-    .set_conf =     primesat_set_conf,
-    .get_conf =     primesat_get_conf,
+    //#.set_conf =     primesat_set_conf,
+    //#.get_conf =     primesat_get_conf,
 
     .set_freq =     primesat_set_freq,
     .get_freq =     primesat_get_freq,
-    .set_mode =     primesat_set_mode,
-    .get_mode =     primesat_get_mode,
+    //#.set_mode =     primesat_set_mode,
+    //#.get_mode =     primesat_get_mode,
     .set_vfo =      primesat_set_vfo,
     .get_vfo =      primesat_get_vfo,
 
@@ -685,14 +722,14 @@ struct rig_caps primecontroller_caps =
     //.get_level =     primesat_get_level,
     //.set_func =      primesat_set_func,
     //.get_func =      primesat_get_func,
-    .set_parm =      primesat_set_parm,
-    .get_parm =      primesat_get_parm,
-    .set_ext_level = primesat_set_ext_level,
-    .get_ext_level = primesat_get_ext_level,
-    .set_ext_func =  primesat_set_ext_func,
-    .get_ext_func =  primesat_get_ext_func,
-    .set_ext_parm =  primesat_set_ext_parm,
-    .get_ext_parm =  primesat_get_ext_parm,
+    //#.set_parm =      primesat_set_parm,
+    //#.get_parm =      primesat_get_parm,
+    //#.set_ext_level = primesat_set_ext_level,
+    //#.get_ext_level = primesat_get_ext_level,
+    //#.set_ext_func =  primesat_set_ext_func,
+    //#.get_ext_func =  primesat_get_ext_func,
+    //#.set_ext_parm =  primesat_set_ext_parm,
+    //#.get_ext_parm =  primesat_get_ext_parm,
 
     .get_info =      primesat_get_info,
 
@@ -729,7 +766,7 @@ struct rig_caps primecontroller_caps =
     //.set_bank =   primesat_set_bank,
     //.set_mem =    primesat_set_mem,
     //.get_mem =    primesat_get_mem,
-    .vfo_op =     primesat_vfo_op,
+    //#.vfo_op =     primesat_vfo_op,
     //.scan =       primesat_scan,
     //.send_dtmf =  primesat_send_dtmf,
     //.recv_dtmf =  primesat_recv_dtmf,
