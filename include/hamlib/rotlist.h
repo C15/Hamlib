@@ -702,6 +702,20 @@
 
 
 /**
+ * \brief A macro that returns the model number of the PRIMESAT backend.
+ *
+ * \def ROT_MODEL_PRIMESAT
+ *
+ * The PRIMESAT backend can be used with PRIMESAT * rotators. 
+ */
+//! @cond Doxygen_Suppress
+#define ROT_PRIMESAT 28
+#define ROT_BACKEND_PRIMESAT "Primesat"
+//! @endcond
+#define ROT_MODEL_PRIMESAT ROT_MAKE_MODEL(ROT_PRIMESAT, 1)
+
+
+/**
  * \brief Convenience type definition for a rotator model.
  *
  * \typedef typedef int rot_model_t

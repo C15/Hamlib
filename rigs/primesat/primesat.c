@@ -155,9 +155,9 @@ static void init_message_data(struct primesat_message *data)
 {
     data->start_flag='$';
     memcpy(data->az_flag, (void *) "AZ", 2);
-    memcpy(data->az, (void *) "100", 3);
+    memcpy(data->az, (void *) "AAA", 3);
     memcpy(data->el_flag, (void *) "EL", 2);
-    memcpy(data->el, (void *) "020", 3);
+    memcpy(data->el, (void *) "EEE", 3);
     memcpy(data->ul_flag, (void *) "UL", 2);
     memcpy(data->dl_flag, (void *) "DL", 2);
     data->ul[4] = '.';
