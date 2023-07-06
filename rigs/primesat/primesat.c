@@ -160,7 +160,8 @@ static void init_message_data(struct primesat_message *data)
     memcpy(data->el, (void *) "020", 3);
     memcpy(data->ul_flag, (void *) "UL", 2);
     memcpy(data->dl_flag, (void *) "DL", 2);
-    memcpy(data->ul, (void *) "0145.000001", 11);
+    data->ul[4] = '.';
+    data->dl[4] = '.';
     data->st1=0b10100110; //Hardcoded for icom radio, uplink and downlink update, G5500 rotator, no rotator update
     data->st2=0b01101101; //Hardcoded for fm uplink and downlink, and 9600 radio connection
     data->st3=0b10000001; //Hardcoded for ic910 radio
