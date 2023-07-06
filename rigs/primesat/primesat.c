@@ -327,7 +327,7 @@ static int primesat_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
     ENTERFUNC;
 
     //setting uplink
-    if(vfo == priv->tx_vfo)
+    if(vfo == RIG_VFO_TX)
     {
         priv->uplink = freq;
         fill_frequency_members(data->ul, (uint32_t) freq);
@@ -342,8 +342,8 @@ static int primesat_set_freq(RIG *rig, vfo_t vfo, freq_t freq)
     write_block(&rig->state.rigport, (void *) data, 48);
 
 
-    rig_debug(RIG_DEBUG_TRACE, "%s: uplink=%s\n downlink=%s\n",
-              __func__, data->ul, data->dl);
+    rig_debug(RIG_DEBUG_TRACE, "%s: VFO=%s  uplink=%.0f\n downlink=%.0f\n",
+              __func__, rig_strvfo(vfo), priv->uplink, priv->downlink);
     RETURNFUNC(RIG_OK);
 }
 
@@ -393,7 +393,7 @@ static int primesat_set_vfo(RIG *rig, vfo_t vfo)
 {
     struct primesat_priv_data *priv = (struct primesat_priv_data *)rig->state.priv;
     ENTERFUNC;
-    usleep(CMDSLEEP);
+    rig->state.current_vfo = vfo;
     rig_debug(RIG_DEBUG_VERBOSE, "%s called: %s\n", __func__, rig_strvfo(vfo));
 
     RETURNFUNC(RIG_OK);
